@@ -17,7 +17,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 
-__all__ = ['JzAzBz', 'XYZ']
+__all__ = ['JzAzBz', 'XYZ', 'YCoCg']
 
 from .jzazbz import JzAzBz
 from .xyz import XYZ
+from .ycocg import YCoCg
