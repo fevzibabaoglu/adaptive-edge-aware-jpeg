@@ -17,57 +17,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 
-import numba as nb
 import numpy as np
 
-
-@nb.njit(fastmath=True, parallel=True, cache=True)
-def _srgb_to_linear_rgb(rgb):
-    """sRGB to linear RGB conversion using Numba."""
-    # Define constants
-    threshold = 0.04045
-    M1, M2 = 2.4, 12.92
-    A, B = 1.055, 0.055
-
-    # Get array size
-    N, C = rgb.shape
-    linear_rgb = np.empty_like(rgb, dtype=np.float32)
-
-    for i in nb.prange(N):
-        for j in range(C):
-            v = rgb[i, j]
-            if v <= threshold:
-                linear_rgb[i, j] = v / M2
-            else:
-                linear_rgb[i, j] = ((v + B) / A) ** M1
-
-    return linear_rgb
-
-@nb.njit(fastmath=True, parallel=True, cache=True)
-def _linear_rgb_to_srgb(linear_rgb):
-    """Linear RGB to sRGB conversion using Numba."""
-    # Define constants
-    threshold = 0.0031308
-    A, B = 1.055, 0.055
-    gamma = 1 / 2.4
-    scale = 12.92
-
-    # Get array size
-    N, C = linear_rgb.shape
-    srgb = np.empty_like(linear_rgb, dtype=np.float32)
-
-    for i in nb.prange(N):
-        for j in range(C):
-            v = linear_rgb[i, j]
-            if v <= threshold:
-                srgb[i, j] = v * scale
-            else:
-                srgb[i, j] = A * (v ** gamma) - B
-
-            # Clip values to ensure valid sRGB output (range: 0 to 1)
-            srgb[i, j] = max(0.0, min(1.0, srgb[i, j]))
-
-    return srgb
+from .common import _srgb_to_linear_rgb, _linear_rgb_to_srgb
 
 
 class XYZ:
