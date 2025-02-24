@@ -88,7 +88,10 @@ class YCoCg:
         if ycocg.ndim != 2 or ycocg.shape[1] != 3:
             raise ValueError("Input array must be a 3D with 3 channels (y, co, cg).")
         
-        return np.dot(ycocg, YCoCg.M_YCOCG_TO_SRGB_T)
+        srgb = np.dot(ycocg, YCoCg.M_YCOCG_TO_SRGB_T)
+
+        # Clip values to ensure valid sRGB output (range: 0 to 1)
+        return np.clip(srgb, 0.0, 1.0)
     
     @staticmethod
     def srgb_to_ycocg_r(srgb: np.ndarray) -> np.ndarray:
