@@ -20,21 +20,15 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import numba as nb
 import numpy as np
 
+from .common import _pq_eotf, _pq_inverse_eotf
 from .xyz import XYZ
 
 
 @nb.njit(fastmath=True, parallel=True, cache=True)
-def _xyz_to_jzazbz(xyz, b, g, d, d0, c1, c2, c3, n, p, lp, M_XYZ_TO_LMS, M_LMS_P_TO_IZAZBZ):
+def _xyz_to_jzazbz(xyz, b, g, d, d0, p, M_XYZ_TO_LMS, M_LMS_P_TO_IZAZBZ):
     """XYZ to JzAzBz conversion using Numba."""
     N = xyz.shape[0]
     jzazbz = np.empty_like(xyz, dtype=np.float32)
-
-    # Helper function for the EOTF inverse.
-    def eotf_inverse(LMS_component):
-        tmp = (LMS_component / lp) ** n
-        num = c1 + c2 * tmp
-        den = 1.0 + c3 * tmp
-        return (num / den) ** p
 
     for i in nb.prange(N):
         X, Y, Z = xyz[i, 0], xyz[i, 1], xyz[i, 2]
@@ -55,10 +49,10 @@ def _xyz_to_jzazbz(xyz, b, g, d, d0, c1, c2, c3, n, p, lp, M_XYZ_TO_LMS, M_LMS_P
              M_XYZ_TO_LMS[2, 1] * Y_p + 
              M_XYZ_TO_LMS[2, 2] * Z_p)
 
-        # LMS to L'M'S' (PQ-like compression)
-        L_p = eotf_inverse(L)
-        M_p = eotf_inverse(M)
-        S_p = eotf_inverse(S)
+        # LMS to L'M'S' (PQ inverse EOTF transform)
+        L_p = _pq_inverse_eotf(L, m2=p)
+        M_p = _pq_inverse_eotf(M, m2=p)
+        S_p = _pq_inverse_eotf(S, m2=p)
 
         # L'M'S' to IzAzBz
         Iz = (M_LMS_P_TO_IZAZBZ[0, 0] * L_p +
@@ -81,24 +75,10 @@ def _xyz_to_jzazbz(xyz, b, g, d, d0, c1, c2, c3, n, p, lp, M_XYZ_TO_LMS, M_LMS_P
     return jzazbz
 
 @nb.njit(fastmath=True, parallel=True, cache=True)
-def _jzazbz_to_xyz(jzazbz, b, g, d, d0, c1, c2, c3, n, p, lp, M_LMS_TO_XYZ, M_IZAZBZ_TO_LMS_P):
+def _jzazbz_to_xyz(jzazbz, b, g, d, d0, p, M_LMS_TO_XYZ, M_IZAZBZ_TO_LMS_P):
     """JzAzBz to XYZ conversion using Numba."""
     N = jzazbz.shape[0]
     xyz = np.empty_like(jzazbz, dtype=np.float32)
-
-    # Helper function for the EOTF.
-    def eotf(LMS_p_component):
-        tmp = LMS_p_component ** (1.0 / p)
-        num = tmp - c1
-        den = c2 - c3 * tmp
-
-        # Clamp negative values to zero
-        if num < 0.0:
-            num = 0.0
-        if den <= 0.0:
-            den = 1e-12
-        
-        return lp * (num / den) ** (1.0 / n)
 
     for i in nb.prange(N):
         Jz, Az, Bz = jzazbz[i, 0], jzazbz[i, 1], jzazbz[i, 2]
@@ -118,9 +98,9 @@ def _jzazbz_to_xyz(jzazbz, b, g, d, d0, c1, c2, c3, n, p, lp, M_LMS_TO_XYZ, M_IZ
                M_IZAZBZ_TO_LMS_P[2, 2] * Bz)
 
         # L'M'S' to LMS (inverse PQ)
-        L = eotf(L_p)
-        M = eotf(M_p)
-        S = eotf(S_p)
+        L = _pq_eotf(L_p, m2=p)
+        M = _pq_eotf(M_p, m2=p)
+        S = _pq_eotf(S_p, m2=p)
 
         # LMS to X'Y'Z'
         X_p = (M_LMS_TO_XYZ[0, 0] * L +
@@ -154,13 +134,8 @@ class JzAzBz:
     D = -0.56
     D0 = 1.6295499532821566e-11
 
-    # PQ-like constants (EOTF Inverse)
-    C1 = 3424 / (2 ** 12)
-    C2 = 2413 / (2 ** 7)
-    C3 = 2392 / (2 ** 7)
-    N = 2610 / (2 ** 14)
+    # PQ EOTF custom constants
     P = 1.7 * 2523 / (2 ** 5)
-    Lp = 10000.0  # reference luminance (cd/m^2)
 
     # Transformation matrix from XYZ to LMS
     M_XYZ_TO_LMS = np.array([
@@ -202,8 +177,7 @@ class JzAzBz:
         xyz = XYZ.srgb_to_xyz(srgb)
         return _xyz_to_jzazbz(
             xyz,
-            JzAzBz.B, JzAzBz.G, JzAzBz.D, JzAzBz.D0,
-            JzAzBz.C1, JzAzBz.C2, JzAzBz.C3, JzAzBz.N, JzAzBz.P, JzAzBz.Lp,
+            JzAzBz.B, JzAzBz.G, JzAzBz.D, JzAzBz.D0, JzAzBz.P,
             JzAzBz.M_XYZ_TO_LMS, JzAzBz.M_LMS_P_TO_IZAZBZ
         )
 
@@ -225,8 +199,7 @@ class JzAzBz:
         
         xyz = _jzazbz_to_xyz(
             jzazbz,
-            JzAzBz.B, JzAzBz.G, JzAzBz.D, JzAzBz.D0,
-            JzAzBz.C1, JzAzBz.C2, JzAzBz.C3, JzAzBz.N, JzAzBz.P, JzAzBz.Lp,
+            JzAzBz.B, JzAzBz.G, JzAzBz.D, JzAzBz.D0, JzAzBz.P,
             JzAzBz.M_LMS_TO_XYZ, JzAzBz.M_IZAZBZ_TO_LMS_P
         )
         return XYZ.xyz_to_srgb(xyz)

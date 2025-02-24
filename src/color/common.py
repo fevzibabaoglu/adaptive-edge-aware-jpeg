@@ -21,6 +21,14 @@ import numba as nb
 import numpy as np
 
 
+__all__ = [
+    '_srgb_to_linear_rgb',
+    '_linear_rgb_to_srgb',
+    '_pq_eotf',
+    '_pq_inverse_eotf'
+]
+
+
 @nb.njit(fastmath=True, parallel=True, cache=True)
 def _srgb_to_linear_rgb(rgb):
     """sRGB to linear RGB conversion using Numba."""
@@ -68,3 +76,42 @@ def _linear_rgb_to_srgb(linear_rgb):
             srgb[i, j] = max(0.0, min(1.0, srgb[i, j]))
 
     return srgb
+
+@nb.njit(fastmath=True, cache=True)
+def _pq_eotf(
+    color_component, 
+    c1 = 3424 / (2 ** 12),
+    c2 = 2413 / (2 ** 7),
+    c3 = 2392 / (2 ** 7),
+    m1 = 2610 / (2 ** 14),
+    m2 = 2523 / (2 ** 5),
+    lp = 10000.0
+):
+    """Perceptual Quantizer (PQ) Electro-Optical Transfer Function (EOTF)."""
+    tmp = color_component ** (1.0 / m2)
+    num = tmp - c1
+    den = c2 - c3 * tmp
+
+    # Clamp negative values to zero
+    if num < 0.0:
+        num = 0.0
+    if den <= 0.0:
+        den = 1e-12
+
+    return lp * (num / den) ** (1.0 / m1)
+
+@nb.njit(fastmath=True, cache=True)
+def _pq_inverse_eotf(
+    color_component, 
+    c1 = 3424 / (2 ** 12),
+    c2 = 2413 / (2 ** 7),
+    c3 = 2392 / (2 ** 7),
+    m1 = 2610 / (2 ** 14),
+    m2 = 2523 / (2 ** 5),
+    lp = 10000.0
+):
+    """Perceptual Quantizer (PQ) Inverse Electro-Optical Transfer Function (EOTF)."""
+    tmp = (color_component / lp) ** m1
+    num = c1 + c2 * tmp
+    den = 1.0 + c3 * tmp
+    return (num / den) ** m2

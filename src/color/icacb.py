@@ -20,21 +20,15 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import numba as nb
 import numpy as np
 
+from .common import _pq_eotf, _pq_inverse_eotf
 from .xyz import XYZ
 
 
 @nb.njit(fastmath=True, parallel=True, cache=True)
-def _xyz_to_icacb(xyz, c1, c2, c3, n, m, lp, M_XYZ_TO_RGB_BAR, M_RGB_P_TO_ICACB):
+def _xyz_to_icacb(xyz, M_XYZ_TO_RGB_BAR, M_RGB_P_TO_ICACB):
     """XYZ to ICaCb conversion using Numba."""
     N = xyz.shape[0]
     icacb = np.empty_like(xyz, dtype=np.float32)
-
-    # Helper function for the PQ transform.
-    def pq(RGB_bar):
-        tmp = (RGB_bar / lp) ** n
-        num = c1 + c2 * tmp
-        den = 1.0 + c3 * tmp
-        return (num / den) ** m
 
     for i in nb.prange(N):
         X, Y, Z = xyz[i, 0], xyz[i, 1], xyz[i, 2]
@@ -50,10 +44,10 @@ def _xyz_to_icacb(xyz, c1, c2, c3, n, m, lp, M_XYZ_TO_RGB_BAR, M_RGB_P_TO_ICACB)
                  M_XYZ_TO_RGB_BAR[2, 1] * Y + 
                  M_XYZ_TO_RGB_BAR[2, 2] * Z)
 
-        # RGB_bar to R'G'B' (PQ transform)
-        R_p = pq(R_bar)
-        G_p = pq(G_bar)
-        B_p = pq(B_bar)
+        # RGB_bar to R'G'B' (PQ inverse EOTF transform)
+        R_p = _pq_inverse_eotf(R_bar)
+        G_p = _pq_inverse_eotf(G_bar)
+        B_p = _pq_inverse_eotf(B_bar)
 
         # R'G'B' to ICaCb
         I_ = (M_RGB_P_TO_ICACB[0, 0] * R_p +
@@ -73,24 +67,10 @@ def _xyz_to_icacb(xyz, c1, c2, c3, n, m, lp, M_XYZ_TO_RGB_BAR, M_RGB_P_TO_ICACB)
     return icacb
 
 @nb.njit(fastmath=True, parallel=True, cache=True)
-def _icacb_to_xyz(icacb, c1, c2, c3, n, m, lp, M_RGB_BAR_TO_XYZ, M_ICACB_TO_RGB_P):
+def _icacb_to_xyz(icacb, M_RGB_BAR_TO_XYZ, M_ICACB_TO_RGB_P):
     """ICaCb to XYZ conversion using Numba."""
     N = icacb.shape[0]
     xyz = np.empty_like(icacb, dtype=np.float32)
-
-    # Helper function for the PQ-inverse.
-    def pq_inverse(RGB_p_component):
-        tmp = RGB_p_component ** (1.0 / m)
-        num = tmp - c1
-        den = c2 - c3 * tmp
-
-         # Clamp negative values to zero
-        if num < 0.0:
-            num = 0.0
-        if den <= 0.0:
-            den = 1e-12
-
-        return lp * (num / den) ** (1.0 / n)
 
     for i in nb.prange(N):
         I_, Ca, Cb = icacb[i, 0], icacb[i, 1], icacb[i, 2]
@@ -106,10 +86,10 @@ def _icacb_to_xyz(icacb, c1, c2, c3, n, m, lp, M_RGB_BAR_TO_XYZ, M_ICACB_TO_RGB_
                M_ICACB_TO_RGB_P[2, 1] * Ca +
                M_ICACB_TO_RGB_P[2, 2] * Cb)
         
-        # R'G'B' to RGB_bar (PQ-inverse transform)
-        R_bar = pq_inverse(R_p)
-        G_bar = pq_inverse(G_p)
-        B_bar = pq_inverse(B_p)
+        # R'G'B' to RGB_bar (PQ EOTF transform)
+        R_bar = _pq_eotf(R_p)
+        G_bar = _pq_eotf(G_p)
+        B_bar = _pq_eotf(B_p)
 
         # RGB_bar to XYZ
         X = (M_RGB_BAR_TO_XYZ[0, 0] * R_bar +
@@ -130,14 +110,6 @@ def _icacb_to_xyz(icacb, c1, c2, c3, n, m, lp, M_RGB_BAR_TO_XYZ, M_ICACB_TO_RGB_
 
 
 class ICaCb:
-    # PQ constants
-    N = 2610 / (2 ** 14)
-    M = 2523 / (2 ** 5)
-    C1 = 3424 / (2 ** 12)
-    C2 = 2413 / (2 ** 7)
-    C3 = 2392 / (2 ** 7)
-    Lp = 10000.0  # reference luminance (cd/m^2)
-
     # Transformation matrix from XYZ to RGB_bar
     M_XYZ_TO_RGB_BAR = np.array([
         [0.37613, 0.70431, -0.05675],
@@ -178,7 +150,6 @@ class ICaCb:
         xyz = XYZ.srgb_to_xyz(srgb)
         return _xyz_to_icacb(
             xyz,
-            ICaCb.C1, ICaCb.C2, ICaCb.C3, ICaCb.N, ICaCb.M, ICaCb.Lp,
             ICaCb.M_XYZ_TO_RGB_BAR, ICaCb.M_RGB_P_TO_ICACB
         )
 
@@ -200,7 +171,6 @@ class ICaCb:
         
         xyz = _icacb_to_xyz(
             icacb,
-            ICaCb.C1, ICaCb.C2, ICaCb.C3, ICaCb.N, ICaCb.M, ICaCb.Lp,
             ICaCb.M_RGB_BAR_TO_XYZ, ICaCb.M_ICACB_TO_RGB_P
         )
         return XYZ.xyz_to_srgb(xyz)
