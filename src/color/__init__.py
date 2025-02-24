@@ -17,11 +17,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 
-__all__ = ['ICaCb', 'ICtCp', 'JzAzBz', 'SYCC', 'XYZ', 'YCoCg']
+__all__ = ['get_color_spaces', 'convert']
 
-from .icacb import ICaCb
-from .ictcp import ICtCp
-from .jzazbz import JzAzBz
-from .sycc import SYCC
-from .xyz import XYZ
-from .ycocg import YCoCg
+from .conversion import get_color_spaces, convert
