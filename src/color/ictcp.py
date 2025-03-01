@@ -145,7 +145,7 @@ class ICtCp:
         if not isinstance(srgb, np.ndarray):
             raise TypeError("Input must be a numpy array.")
         if srgb.ndim != 2 or srgb.shape[1] != 3:
-            raise ValueError("Input array must be a 3D with 3 channels (r, g, b).")
+            raise ValueError("Input array must be a 2D with 3 channels (r, g, b).")
         
         xyz = XYZ.srgb_to_xyz(srgb)
         return _xyz_to_ictcp(

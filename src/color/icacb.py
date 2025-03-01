@@ -145,7 +145,7 @@ class ICaCb:
         if not isinstance(srgb, np.ndarray):
             raise TypeError("Input must be a numpy array.")
         if srgb.ndim != 2 or srgb.shape[1] != 3:
-            raise ValueError("Input array must be a 3D with 3 channels (r, g, b).")
+            raise ValueError("Input array must be a 2D with 3 channels (r, g, b).")
         
         xyz = XYZ.srgb_to_xyz(srgb)
         return _xyz_to_icacb(
@@ -167,7 +167,7 @@ class ICaCb:
         if not isinstance(icacb, np.ndarray):
             raise TypeError("Input must be a numpy array.")
         if icacb.ndim != 2 or icacb.shape[1] != 3:
-            raise ValueError("Input array must be a 3D with 3 channels (i, ca, cb).")
+            raise ValueError("Input array must be a 2D with 3 channels (i, ca, cb).")
         
         xyz = _icacb_to_xyz(
             icacb,

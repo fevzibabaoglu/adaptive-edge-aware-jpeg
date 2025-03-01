@@ -68,7 +68,7 @@ def convert(from_space: str, to_space: str, data: np.ndarray) -> np.ndarray:
     if not isinstance(data, np.ndarray):
         raise TypeError("Data input must be a numpy array.")
     if data.ndim != 2 or data.shape[1] != 3:
-        raise ValueError("Data input array must be a 3D with 3 channels.")
+        raise ValueError("Data input array must be a 2D with 3 channels.")
     
     if from_space not in COLOR_CLASSES.keys() or to_space not in COLOR_CLASSES.keys():
         raise ValueError("Invalid color space. Please check the available color spaces.")

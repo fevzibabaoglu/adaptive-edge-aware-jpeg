@@ -54,7 +54,7 @@ class XYZ:
         if not isinstance(srgb, np.ndarray):
             raise TypeError("Input must be a numpy array.")
         if srgb.ndim != 2 or srgb.shape[1] != 3:
-            raise ValueError("Input array must be a 3D with 3 channels (r, g, b).")
+            raise ValueError("Input array must be a 2D with 3 channels (r, g, b).")
 
         linear_rgb = _srgb_to_linear_rgb(srgb)
         return np.dot(linear_rgb, XYZ.M_LINEAR_RGB_TO_XYZ_T)
@@ -73,7 +73,7 @@ class XYZ:
         if not isinstance(xyz, np.ndarray):
             raise TypeError("Input must be a numpy array.")
         if xyz.ndim != 2 or xyz.shape[1] != 3:
-            raise ValueError("Input array must be a 3D with 3 channels (x, y, z).")
+            raise ValueError("Input array must be a 2D with 3 channels (x, y, z).")
         
         linear_rgb = np.dot(xyz, XYZ.M_XYZ_TO_LINEAR_RGB_T)
         return _linear_rgb_to_srgb(linear_rgb)

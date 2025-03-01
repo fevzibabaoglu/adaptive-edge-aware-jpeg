@@ -68,7 +68,7 @@ class YCoCg:
         if not isinstance(srgb, np.ndarray):
             raise TypeError("Input must be a numpy array.")
         if srgb.ndim != 2 or srgb.shape[1] != 3:
-            raise ValueError("Input array must be a 3D with 3 channels (r, g, b).")
+            raise ValueError("Input array must be a 2D with 3 channels (r, g, b).")
         
         return np.dot(srgb, YCoCg.M_SRGB_TO_YCOCG_T)
     
@@ -86,7 +86,7 @@ class YCoCg:
         if not isinstance(ycocg, np.ndarray):
             raise TypeError("Input must be a numpy array.")
         if ycocg.ndim != 2 or ycocg.shape[1] != 3:
-            raise ValueError("Input array must be a 3D with 3 channels (y, co, cg).")
+            raise ValueError("Input array must be a 2D with 3 channels (y, co, cg).")
         
         srgb = np.dot(ycocg, YCoCg.M_YCOCG_TO_SRGB_T)
 
@@ -107,7 +107,7 @@ class YCoCg:
         if not isinstance(srgb, np.ndarray):
             raise TypeError("Input must be a numpy array.")
         if srgb.ndim != 2 or srgb.shape[1] != 3:
-            raise ValueError("Input array must be a 3D with 3 channels (r, g, b).")
+            raise ValueError("Input array must be a 2D with 3 channels (r, g, b).")
         
         return np.dot(srgb, YCoCg.M_SRGB_TO_YCOCG_R_T)
     
@@ -125,7 +125,7 @@ class YCoCg:
         if not isinstance(ycocg_r, np.ndarray):
             raise TypeError("Input must be a numpy array.")
         if ycocg_r.ndim != 2 or ycocg_r.shape[1] != 3:
-            raise ValueError("Input array must be a 3D with 3 channels (y, co, cg).")
+            raise ValueError("Input array must be a 2D with 3 channels (y, co, cg).")
         
         srgb = np.dot(ycocg_r, YCoCg.M_YCOCG_R_TO_SRGB_T)
         

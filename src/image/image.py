@@ -35,7 +35,7 @@ class Image:
 
     @classmethod
     def load(cls, path):
-        img = iio.imread(path).astype(np.float32) / 255.0
+        img = iio.imread(path, mode="RGB").astype(np.float32) / 255.0
         return cls(img, img.shape)
 
     @staticmethod
