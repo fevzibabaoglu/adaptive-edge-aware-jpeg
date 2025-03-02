@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 
-__all__ = ['EdgeDetection']
+__all__ = ['EdgeDetection', 'QuadTree']
 
 from .edge_detection import EdgeDetection
+from .quadtree import QuadTree
