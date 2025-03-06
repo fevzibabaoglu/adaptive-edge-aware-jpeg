@@ -40,6 +40,9 @@ class Image:
         img = iio.imread(path, mode="RGB").astype(np.float32) / 255.0
         return cls(img, img.shape)
 
+    def copy(self):
+        return Image.from_array(self.img.copy(), self.original_shape)
+
     @staticmethod
     def save(img, path):
         iio.imwrite(path, (img.img * 255).astype(np.uint8))
