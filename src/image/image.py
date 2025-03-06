@@ -28,6 +28,8 @@ class Image:
 
     @classmethod
     def from_array(cls, img, shape=None):
+        if shape is None:
+            shape = img.shape
         img_obj = cls(img, shape)
         if shape is not None:
             Image.reshape(img_obj, shape)
