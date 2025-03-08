@@ -48,7 +48,7 @@ class Jpeg:
         self.img = img
         self.settings = Jpeg.COMMON_SETTINGS[color_space]
 
-    def compress(self) -> Image:
+    def compress(self):
         img_color_converted = Jpeg.color_conversion(self.img.get_flattened(), self.settings['color_space'])
         img_color_converted = img_color_converted.reshape(self.img.original_shape)
 
@@ -60,6 +60,10 @@ class Jpeg:
         lum_blocks = Jpeg.block_split(lum)
         chrom_1_blocks = Jpeg.block_split(chrom_1_downsampled)
         chrom_2_blocks = Jpeg.block_split(chrom_2_downsampled)
+
+        lum_dct = Jpeg.dct(lum_blocks)
+        chrom_1_dct = Jpeg.dct(chrom_1_blocks)
+        chrom_2_dct = Jpeg.dct(chrom_2_blocks)
 
         #TODO to be continued
         pass
@@ -106,3 +110,11 @@ class Jpeg:
 
             blocks.append(block)
         return blocks
+
+    @staticmethod
+    def dct(blocks):
+        return [cv.dct(block) for block in blocks]
+
+    @staticmethod
+    def inverse_dct(blocks):
+        return [cv.idct(block) for block in blocks]
