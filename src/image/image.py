@@ -22,18 +22,18 @@ import numpy as np
 
 
 class Image:
-    def __init__(self, img, shape):
-        self.img = img
+    def __init__(self, data, shape):
+        self.data: np.ndarray = data
         self.original_shape = shape
 
     @classmethod
-    def from_array(cls, img, shape=None):
+    def from_array(cls, data, shape=None):
         if shape is None:
-            shape = img.shape
-        img_obj = cls(img, shape)
+            shape = data.shape
+        img = cls(data, shape)
         if shape is not None:
-            Image.reshape(img_obj, shape)
-        return img_obj
+            img.reshape(shape)
+        return img
 
     @classmethod
     def load(cls, path):
@@ -41,21 +41,17 @@ class Image:
         return cls(img, img.shape)
 
     def copy(self):
-        return Image.from_array(self.img.copy(), self.original_shape)
+        return Image.from_array(self.data.copy(), self.original_shape)
 
-    @staticmethod
-    def save(img, path):
-        iio.imwrite(path, (img.img * 255).astype(np.uint8))
+    def save(self, path):
+        iio.imwrite(path, (self.data * 255).astype(np.uint8))
 
-    @staticmethod
-    def flatten(img):
-        img.img = img.img.reshape(-1, img.original_shape[-1])
-        return img.img
+    def get_flattened(self) -> np.ndarray:
+        return self.data.reshape(-1, self.original_shape[-1])
 
-    @staticmethod
-    def reshape(img, shape):
-        img.img = img.img.reshape(shape)
-        return img.img
+    def reshape(self, shape) -> np.ndarray:
+        self.data = self.data.reshape(shape)
+        return self.data
 
     def __str__(self) -> str:
-        return self.img.__str__()
+        return self.data.__str__()
