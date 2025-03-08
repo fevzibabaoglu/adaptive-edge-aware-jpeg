@@ -21,6 +21,7 @@ import cv2 as cv
 import numpy as np
 
 from color import convert
+from edge_detection import EdgeDetection, QuadTree
 from image import Image
 
 
@@ -56,6 +57,10 @@ class Jpeg:
         chrom_1_downsampled = Jpeg.downsample(chrom_1, *self.settings['chroma_subsampling']['chrom_1'])
         chrom_2_downsampled = Jpeg.downsample(chrom_2, *self.settings['chroma_subsampling']['chrom_2'])
 
+        lum_blocks = Jpeg.block_split(lum)
+        chrom_1_blocks = Jpeg.block_split(chrom_1_downsampled)
+        chrom_2_blocks = Jpeg.block_split(chrom_2_downsampled)
+
         #TODO to be continued
         pass
 
@@ -83,3 +88,21 @@ class Jpeg:
 
         new_size = (target_shape[1], target_shape[0])
         return cv.resize(image_layer, new_size, interpolation=cv.INTER_LINEAR)
+    
+    @staticmethod
+    def block_split(image_layer):
+        edge_data = EdgeDetection.canny(image_layer)
+        quad_tree = QuadTree(edge_data)
+
+        blocks = []
+        for leaf in quad_tree.get_leaves():
+            x, y, size = leaf.x, leaf.y, leaf.size
+            block = image_layer[y:y+size, x:x+size]
+
+            # Apply padding if necessary
+            pad_height = size - block.shape[0]
+            pad_width = size - block.shape[1]
+            block = np.pad(block, ((0, pad_height), (0, pad_width)), mode='reflect')
+
+            blocks.append(block)
+        return blocks
