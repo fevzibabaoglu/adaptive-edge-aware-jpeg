@@ -70,7 +70,7 @@ class Jpeg:
 
     @staticmethod
     def color_conversion(flattened_img, color_space):
-        return convert("sRGB", color_space, flattened_img)
+        return convert("sRGB", color_space, flattened_img, True)
 
     @staticmethod
     def downsample(image_layer, h_scale, w_scale):
