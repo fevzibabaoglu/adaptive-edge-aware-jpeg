@@ -26,6 +26,17 @@ from image import Image
 
 
 class Jpeg:
+    QUANTIZATION_MATRIX = np.array([
+        [16, 11, 10, 16, 24, 40, 51, 61],
+        [12, 12, 14, 19, 26, 58, 60, 55],
+        [14, 13, 16, 24, 40, 57, 69, 56],
+        [14, 17, 22, 29, 51, 87, 80, 62],
+        [18, 22, 37, 56, 68, 109, 103, 77],
+        [24, 35, 55, 64, 81, 104, 113, 92],
+        [49, 64, 78, 87, 103, 121, 120, 101],
+        [72, 92, 95, 98, 112, 100, 103, 99]
+    ]).astype(np.float32)
+
     COMMON_SETTINGS = {
         'YCoCg': {
             'color_space': 'YCoCg',
@@ -36,7 +47,8 @@ class Jpeg:
         },
     }
 
-    def __init__(self, img: Image, color_space: str | None = None) -> None:
+
+    def __init__(self, img: Image, color_space = None, quality = 80) -> None:
         if not isinstance(img, Image):
             raise TypeError("Input must be an Image object.")
         if img.data.ndim != 3 or img.data.shape[2] != 3:
@@ -46,6 +58,7 @@ class Jpeg:
             color_space = "YCoCg"
 
         self.img = img
+        self.quality = quality
         self.settings = Jpeg.COMMON_SETTINGS[color_space]
 
     def compress(self):
@@ -64,6 +77,10 @@ class Jpeg:
         lum_dct = Jpeg.dct(lum_blocks)
         chrom_1_dct = Jpeg.dct(chrom_1_blocks)
         chrom_2_dct = Jpeg.dct(chrom_2_blocks)
+
+        lum_quantized = Jpeg.quantize(lum_dct, self.quality)
+        chrom_1_quantized = Jpeg.quantize(chrom_1_dct, self.quality)
+        chrom_2_quantized = Jpeg.quantize(chrom_2_dct, self.quality)
 
         #TODO to be continued
         pass
@@ -118,3 +135,31 @@ class Jpeg:
     @staticmethod
     def inverse_dct(blocks):
         return [cv.idct(block) for block in blocks]
+
+    @staticmethod
+    def quantize(blocks, quality):
+        return [
+            np.round(
+                block / Jpeg._get_quantization_matrix(block.shape[0], quality)
+            ).astype(np.int32) 
+            for block in blocks
+        ]
+
+    @staticmethod
+    def dequantize(blocks, quality):
+        return [
+            (
+                block * Jpeg._get_quantization_matrix(block.shape[0], quality)
+            ).astype(np.float32) 
+            for block in blocks
+        ]
+
+    @staticmethod
+    def _get_quantization_matrix(size, quality=80):
+        S = 5000 / quality if quality < 50 else 200 - 2 * quality
+        scaled_matrix = np.floor((S * Jpeg.QUANTIZATION_MATRIX + 50) / 100)
+        scaled_matrix = np.clip(scaled_matrix, 1, None)
+
+        resized = cv.resize(scaled_matrix, (size, size), interpolation=cv.INTER_LINEAR)
+        resized = np.clip(resized, 1, None)
+        return resized.astype(np.int32)
