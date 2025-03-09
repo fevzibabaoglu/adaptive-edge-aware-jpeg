@@ -19,6 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
 
+from .common import _normalize, _denormalize
 from .icacb import ICaCb
 from .ictcp import ICtCp
 from .jzazbz import JzAzBz
@@ -29,14 +30,49 @@ from .ycocg import YCoCg
 
 # Available color spaces
 COLOR_CLASSES = {
-    'sRGB': (None, None),
-    'ICaCb': (ICaCb.srgb_to_icacb, ICaCb.icacb_to_srgb),
-    'ICtCp': (ICtCp.srgb_to_ictcp, ICtCp.ictcp_to_srgb),
-    'JzAzBz': (JzAzBz.srgb_to_jzazbz, JzAzBz.jzazbz_to_srgb),
-    'SYCC': (SYCC.srgb_to_sycc, SYCC.sycc_to_srgb),
-    'XYZ': (XYZ.srgb_to_xyz, XYZ.xyz_to_srgb),
-    'YCoCg': (YCoCg.srgb_to_ycocg, YCoCg.ycocg_to_srgb),
-    'YCoCg-R': (YCoCg.srgb_to_ycocg_r, YCoCg.ycocg_r_to_srgb),
+    'sRGB': (None, None, None, None),
+    'ICaCb': (
+        ICaCb.srgb_to_icacb, 
+        ICaCb.icacb_to_srgb,
+        ICaCb.MIDPOINTS,
+        ICaCb.SCALE_FACTORS,
+    ),
+    'ICtCp': (
+        ICtCp.srgb_to_ictcp, 
+        ICtCp.ictcp_to_srgb,
+        ICtCp.MIDPOINTS,
+        ICtCp.SCALE_FACTORS,
+    ),
+    'JzAzBz': (
+        JzAzBz.srgb_to_jzazbz, 
+        JzAzBz.jzazbz_to_srgb,
+        JzAzBz.MIDPOINTS,
+        JzAzBz.SCALE_FACTORS,
+    ),
+    'SYCC': (
+        SYCC.srgb_to_sycc, 
+        SYCC.sycc_to_srgb,
+        SYCC.MIDPOINTS,
+        SYCC.SCALE_FACTORS,
+    ),
+    'XYZ': (
+        XYZ.srgb_to_xyz, 
+        XYZ.xyz_to_srgb,
+        XYZ.MIDPOINTS,
+        XYZ.SCALE_FACTORS,
+    ),
+    'YCoCg': (
+        YCoCg.srgb_to_ycocg, 
+        YCoCg.ycocg_to_srgb,
+        YCoCg.YCOCG_MIDPOINTS,
+        YCoCg.YCOCG_SCALE_FACTORS,
+    ),
+    'YCoCg-R': (
+        YCoCg.srgb_to_ycocg_r, 
+        YCoCg.ycocg_r_to_srgb,
+        YCoCg.YCOCG_R_MIDPOINTS,
+        YCoCg.YCOCG_R_SCALE_FACTORS
+    ),
 }
 
 
@@ -49,7 +85,7 @@ def get_color_spaces() -> list:
     """
     return list(COLOR_CLASSES.keys())
 
-def convert(from_space: str, to_space: str, data: np.ndarray) -> np.ndarray:
+def convert(from_space: str, to_space: str, data: np.ndarray, normalize: bool = True) -> np.ndarray:
     """
     Convert color data from one color space to another.
     One of the color spaces must be sRGB.
@@ -58,6 +94,7 @@ def convert(from_space: str, to_space: str, data: np.ndarray) -> np.ndarray:
         from_space (str): The source color space (e.g., "sRGB", "XYZ", "ICaCb").
         to_space (str): The target color space (e.g., "ICtCp", "JzAzBz").
         data (np.ndarray): The input color data array (shape: Nx3).
+        normalize (bool): Apply normalization.
 
     Returns:
         np.ndarray: Converted color data in the target color space (shape: Nx3).
@@ -77,8 +114,18 @@ def convert(from_space: str, to_space: str, data: np.ndarray) -> np.ndarray:
 
     # Call srgb_to_x method
     if from_space == "sRGB":
-        return COLOR_CLASSES[to_space][0](data)
+        converted = COLOR_CLASSES[to_space][0](data)
+        return _normalize(
+            converted, 
+            COLOR_CLASSES[to_space][2],
+            COLOR_CLASSES[to_space][3]
+        ) if normalize else converted
     
     # Call x_to_srgb method
     if to_space == "sRGB":
-        return COLOR_CLASSES[from_space][1](data)
+        converted = _denormalize(
+            data, 
+            COLOR_CLASSES[from_space][2],
+            COLOR_CLASSES[from_space][3]
+        ) if normalize else data
+        return COLOR_CLASSES[from_space][1](converted)

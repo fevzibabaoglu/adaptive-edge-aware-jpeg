@@ -157,6 +157,10 @@ class JzAzBz:
     # Transformation matrix from IzAzBz to LMS'
     M_IZAZBZ_TO_LMS_P = np.linalg.inv(M_LMS_P_TO_IZAZBZ)
 
+    # Normalization values (target range: [-127, 127])
+    MIDPOINTS = np.array([0.0087900255, 0.00048353244, -0.0020741792], dtype=np.float32)
+    SCALE_FACTORS = np.array([14448.194, 7590.505, 5552.201], dtype=np.float32)
+
 
     @staticmethod
     def srgb_to_jzazbz(srgb: np.ndarray) -> np.ndarray:

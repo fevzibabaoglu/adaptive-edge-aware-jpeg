@@ -37,6 +37,11 @@ class YCoCg:
     ], dtype=np.float32)
     M_YCOCG_TO_SRGB_T = M_YCOCG_TO_SRGB.T
 
+    # YCOCG normalization values (target range: [-127, 127])
+    YCOCG_MIDPOINTS = np.array([0.5, 0.0, 0.0], dtype=np.float32)
+    YCOCG_SCALE_FACTORS = np.array([254.0, 254.0, 254.0], dtype=np.float32)
+
+
     # Transformation matrix from sRGB to YCoCg-R
     M_SRGB_TO_YCOCG_R = np.array([
         [0.25, 0.50, 0.25],
@@ -52,6 +57,10 @@ class YCoCg:
         [1.00, -0.50, -0.50]
     ], dtype=np.float32)
     M_YCOCG_R_TO_SRGB_T = M_YCOCG_R_TO_SRGB.T
+
+    # YCOCG-R normalization values (target range: [-127, 127])
+    YCOCG_R_MIDPOINTS = np.array([0.5, 0.0, 0.0], dtype=np.float32)
+    YCOCG_R_SCALE_FACTORS = np.array([254.0, 127.0, 127.0], dtype=np.float32)
 
 
     @staticmethod

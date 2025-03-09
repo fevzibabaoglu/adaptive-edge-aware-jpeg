@@ -39,6 +39,10 @@ class XYZ:
     ], dtype=np.float32)
     M_XYZ_TO_LINEAR_RGB_T = M_XYZ_TO_LINEAR_RGB.T
 
+    # Normalization values (target range: [-127, 127])
+    MIDPOINTS = np.array([0.47523502, 0.50000006, 0.544415], dtype=np.float32)
+    SCALE_FACTORS = np.array([267.2362, 253.99997, 233.27792], dtype=np.float32)
+
 
     @staticmethod
     def srgb_to_xyz(srgb: np.ndarray) -> np.ndarray:

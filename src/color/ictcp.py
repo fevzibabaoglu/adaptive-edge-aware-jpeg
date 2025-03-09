@@ -20,7 +20,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import numba as nb
 import numpy as np
 
-from .common import _pq_eotf, _pq_inverse_eotf
+from .common import (
+    _pq_eotf, 
+    _pq_inverse_eotf,
+    _normalize,
+    _denormalize,
+)
 from .xyz import XYZ
 
 
@@ -129,6 +134,10 @@ class ICtCp:
 
     # Transformation matrix from ICtCp to L'M'S'
     M_ICTCP_TO_LMS_P = np.linalg.inv(M_LMS_P_TO_ICTCP)
+
+    # Normalization values (target range: [-127, 127])
+    MIDPOINTS = np.array([0.07497266, -0.0008235276, 0.023989676], dtype=np.float32)
+    SCALE_FACTORS = np.array([1693.9674, 1133.9044, 1694.004], dtype=np.float32)
 
 
     @staticmethod

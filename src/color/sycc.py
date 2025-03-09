@@ -40,6 +40,10 @@ class SYCC:
     ], dtype=np.float32)
     M_SYCC_TO_SRGB_T = M_SYCC_TO_SRGB.T
 
+    # Normalization values (target range: [-127, 127])
+    MIDPOINTS = np.array([0.5000000037252903, 7.450580596923828e-09, 0.0], dtype=np.float32)
+    SCALE_FACTORS = np.array([253.99999810755253, 254.000003784895, 254.0], dtype=np.float32)
+
 
     @staticmethod
     def srgb_to_sycc(srgb: np.ndarray) -> np.ndarray:
