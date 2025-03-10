@@ -17,20 +17,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 
-import math
 import numba as nb
 import numpy as np
 
+from .utils import largest_power_of_2
 
-@nb.njit(fastmath=True, cache=True)
-def _largest_power_of_2(n):
-    """Returns the largest power of 2 less than `n`."""
-    if n <= 0:
-        raise ValueError("n must be positive.")
-    if n <= 2:
-        return n
-    # Largest power of 2 < n
-    return 2 ** math.floor(math.log2(n - 1))
 
 @nb.njit(fastmath=True, cache=True)
 def _has_edge(region):
@@ -79,7 +70,7 @@ class QuadTree:
         self.min_size = min_size
 
         max_size = max(edge_image.shape)
-        root_size = _largest_power_of_2(max_size) * 2
+        root_size = largest_power_of_2(max_size) * 2
         self.root = self._build_tree(0, 0, root_size)
 
     def _build_tree(self, x, y, size):
