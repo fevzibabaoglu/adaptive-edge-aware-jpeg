@@ -21,8 +21,9 @@ import cv2 as cv
 import numpy as np
 
 from color import apply_normalization, convert
-from edge_detection import EdgeDetection, QuadTree
 from image import Image
+from .edge_detection import EdgeDetection
+from .quadtree import QuadTree
 
 
 class Jpeg:
