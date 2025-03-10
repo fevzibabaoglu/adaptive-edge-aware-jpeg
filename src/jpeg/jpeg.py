@@ -40,8 +40,8 @@ class Jpeg:
 
     COMMON_SETTINGS = {
         'YCoCg': {
-            'color_space': 'YCoCg',
-            'chroma_subsampling': {
+            'downsampling_ratio': {
+                'lum': (1, 1),
                 'chrom_1': (2, 4),
                 'chrom_2': (2, 2),
             },
@@ -49,18 +49,28 @@ class Jpeg:
     }
 
 
-    def __init__(self, img: Image, color_space = None, quality = 80) -> None:
-        if not isinstance(img, Image):
-            raise TypeError("Input must be an Image object.")
-        if img.data.ndim != 3 or img.data.shape[2] != 3:
-            raise ValueError("Input array must be a 3D with 3 channels (lum, chrom_1, chrom_2).")
-        
-        if color_space is None or color_space not in Jpeg.COMMON_SETTINGS.keys():
-            color_space = "YCoCg"
+    def __init__(self, img: Image, layer_shape, color_space = 'YCoCg', quality = 80) -> None:
+        if img is None and layer_shape is None:
+            raise ValueError("Image and shape cannot be both None.")
+        if img is not None:
+            if not isinstance(img, Image):
+                raise TypeError("Input must be an Image object.")
+            if img.data.ndim != 3 or img.data.shape[2] != 3:
+                raise ValueError("Input array must be a 3D with 3 channels (lum, chrom_1, chrom_2).")
 
         self.img = img
+        self.layer_shape = layer_shape if img is None else img.original_shape[:2]
         self.quality = quality
+
         self.settings = Jpeg.COMMON_SETTINGS[color_space]
+        self.settings.update({
+            'color_space': color_space,
+            'layer_shapes': {
+                'lum': Jpeg._compute_downsampled_shape(self.layer_shape, self.settings['downsampling_ratio']['lum']),
+                'chrom_1': Jpeg._compute_downsampled_shape(self.layer_shape, self.settings['downsampling_ratio']['chrom_1']),
+                'chrom_2': Jpeg._compute_downsampled_shape(self.layer_shape, self.settings['downsampling_ratio']['chrom_2']),
+            },
+        })
 
     def compress(self):
         img_color_converted = Jpeg.color_conversion(self.img.get_flattened(), self.settings['color_space'])
@@ -68,10 +78,11 @@ class Jpeg:
 
         lum, chrom_1, chrom_2 = img_color_converted[..., 0], img_color_converted[..., 1], img_color_converted[..., 2]
 
-        chrom_1_downsampled = Jpeg.downsample(chrom_1, *self.settings['chroma_subsampling']['chrom_1'])
-        chrom_2_downsampled = Jpeg.downsample(chrom_2, *self.settings['chroma_subsampling']['chrom_2'])
+        lum_downsampled = Jpeg.downsample(lum, *self.settings['downsampling_ratio']['lum'])
+        chrom_1_downsampled = Jpeg.downsample(chrom_1, *self.settings['downsampling_ratio']['chrom_1'])
+        chrom_2_downsampled = Jpeg.downsample(chrom_2, *self.settings['downsampling_ratio']['chrom_2'])
 
-        lum_blocks = Jpeg.block_split(lum, self.settings['color_space'])
+        lum_blocks = Jpeg.block_split(lum_downsampled, self.settings['color_space'])
         chrom_1_blocks = Jpeg.block_split(chrom_1_downsampled, self.settings['color_space'])
         chrom_2_blocks = Jpeg.block_split(chrom_2_downsampled, self.settings['color_space'])
 
@@ -96,22 +107,12 @@ class Jpeg:
 
     @staticmethod
     def downsample(image_layer, h_scale, w_scale):
-        if not isinstance(image_layer, np.ndarray):
-            raise TypeError("Input must be a numpy array.")
-        if image_layer.ndim != 2:
-            raise ValueError("Input array must be a 2D with a single channel.")
-
         h, w = image_layer.shape
         new_size = (w // w_scale, h // h_scale)
         return cv.resize(image_layer, new_size, interpolation=cv.INTER_AREA)
 
     @staticmethod
     def upsample(image_layer, target_shape):
-        if not isinstance(image_layer, np.ndarray):
-            raise TypeError("Input must be a numpy array.")
-        if image_layer.ndim != 2:
-            raise ValueError("Input array must be a 2D with a single channel.")
-
         new_size = (target_shape[1], target_shape[0])
         return cv.resize(image_layer, new_size, interpolation=cv.INTER_LINEAR)
 
@@ -120,7 +121,10 @@ class Jpeg:
         edge_data = EdgeDetection.canny(image_layer)
         quad_tree = QuadTree(edge_data)
 
-        normalized_image = apply_normalization(color_space, image_layer, False)
+        reshaped_image_layer = np.empty((image_layer.size, 3), dtype=image_layer.dtype)
+        reshaped_image_layer[:, 0] = image_layer.flatten()
+        normalized_image = apply_normalization(color_space, reshaped_image_layer, False)
+        normalized_image = normalized_image[:, 0].reshape(image_layer.shape)
 
         blocks = []
         for leaf in quad_tree.get_leaves():
@@ -145,28 +149,24 @@ class Jpeg:
 
     @staticmethod
     def quantize(blocks, quality):
-        return [
-            np.round(
-                block / Jpeg._get_quantization_matrix(block.shape[0], quality)
-            ).astype(np.int32) 
-            for block in blocks
-        ]
+        return [np.round(
+            block / Jpeg._get_quantization_matrix(block.shape[0], quality)
+        ).astype(np.int32) for block in blocks]
 
     @staticmethod
     def dequantize(blocks, quality):
-        return [
-            (
-                block * Jpeg._get_quantization_matrix(block.shape[0], quality)
-            ).astype(np.float32) 
-            for block in blocks
-        ]
+        return [(
+            block * Jpeg._get_quantization_matrix(block.shape[0], quality)
+        ).astype(np.float32) for block in blocks]
 
     @staticmethod
     def _get_quantization_matrix(size, quality=80):
         S = 5000 / quality if quality < 50 else 200 - 2 * quality
         scaled_matrix = np.floor((S * Jpeg.QUANTIZATION_MATRIX + 50) / 100)
-        scaled_matrix = np.clip(scaled_matrix, 1, None)
+        resized_matrix = cv.resize(scaled_matrix, (size, size), interpolation=cv.INTER_LINEAR)
+        resized_matrix = np.clip(resized_matrix, 1, None)
+        return resized_matrix.astype(np.int32)
 
-        resized = cv.resize(scaled_matrix, (size, size), interpolation=cv.INTER_LINEAR)
-        resized = np.clip(resized, 1, None)
-        return resized.astype(np.int32)
+    @staticmethod
+    def _compute_downsampled_shape(layer_shape, downsampling_ratio):
+        return (layer_shape[0] // downsampling_ratio[0], layer_shape[1] // downsampling_ratio[1])
