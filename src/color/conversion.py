@@ -85,7 +85,7 @@ def get_color_spaces() -> list:
     """
     return list(COLOR_CLASSES.keys())
 
-def convert(from_space: str, to_space: str, data: np.ndarray, normalize: bool = True) -> np.ndarray:
+def convert(from_space: str, to_space: str, data: np.ndarray) -> np.ndarray:
     """
     Convert color data from one color space to another.
     One of the color spaces must be sRGB.
@@ -94,7 +94,6 @@ def convert(from_space: str, to_space: str, data: np.ndarray, normalize: bool = 
         from_space (str): The source color space (e.g., "sRGB", "XYZ", "ICaCb").
         to_space (str): The target color space (e.g., "ICtCp", "JzAzBz").
         data (np.ndarray): The input color data array (shape: Nx3).
-        normalize (bool): Apply normalization.
 
     Returns:
         np.ndarray: Converted color data in the target color space (shape: Nx3).
@@ -114,18 +113,41 @@ def convert(from_space: str, to_space: str, data: np.ndarray, normalize: bool = 
 
     # Call srgb_to_x method
     if from_space == "sRGB":
-        converted = COLOR_CLASSES[to_space][0](data)
-        return _normalize(
-            converted, 
-            COLOR_CLASSES[to_space][2],
-            COLOR_CLASSES[to_space][3]
-        ) if normalize else converted
-    
+        return COLOR_CLASSES[to_space][0](data)
+
     # Call x_to_srgb method
     if to_space == "sRGB":
-        converted = _denormalize(
+        return COLOR_CLASSES[from_space][1](data)
+
+def apply_normalization(color_space: str, data: np.ndarray, inverse: bool) -> np.ndarray:
+    """
+    Normalize the color data.
+
+    Args:
+        color_space (str): The data color space (e.g., "sRGB", "XYZ", "ICaCb").
+        data (np.ndarray): The input color data array (shape: Nx3).
+        inverse (bool): Whether to applynormalization or denormalization.
+
+    Returns:
+        np.ndarray: Normalized/Denormalized color data in the target color space (shape: Nx3).
+    """
+    if not isinstance(data, np.ndarray):
+        raise TypeError("Data input must be a numpy array.")
+    if data.ndim != 2 or data.shape[1] != 3:
+        raise ValueError("Data input array must be a 2D with 3 channels.")
+    
+    if color_space not in COLOR_CLASSES.keys():
+        raise ValueError("Invalid color space. Please check the available color spaces.")
+    
+    if inverse:
+        return _denormalize(
             data, 
-            COLOR_CLASSES[from_space][2],
-            COLOR_CLASSES[from_space][3]
-        ) if normalize else data
-        return COLOR_CLASSES[from_space][1](converted)
+            COLOR_CLASSES[color_space][2],
+            COLOR_CLASSES[color_space][3]
+        )
+    else:
+        return _normalize(
+            data, 
+            COLOR_CLASSES[color_space][2],
+            COLOR_CLASSES[color_space][3]
+        )

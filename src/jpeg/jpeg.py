@@ -20,7 +20,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import cv2 as cv
 import numpy as np
 
-from color import convert
+from color import apply_normalization, convert
 from edge_detection import EdgeDetection, QuadTree
 from image import Image
 
@@ -70,9 +70,9 @@ class Jpeg:
         chrom_1_downsampled = Jpeg.downsample(chrom_1, *self.settings['chroma_subsampling']['chrom_1'])
         chrom_2_downsampled = Jpeg.downsample(chrom_2, *self.settings['chroma_subsampling']['chrom_2'])
 
-        lum_blocks = Jpeg.block_split(lum)
-        chrom_1_blocks = Jpeg.block_split(chrom_1_downsampled)
-        chrom_2_blocks = Jpeg.block_split(chrom_2_downsampled)
+        lum_blocks = Jpeg.block_split(lum, self.settings['color_space'])
+        chrom_1_blocks = Jpeg.block_split(chrom_1_downsampled, self.settings['color_space'])
+        chrom_2_blocks = Jpeg.block_split(chrom_2_downsampled, self.settings['color_space'])
 
         lum_dct = Jpeg.dct(lum_blocks)
         chrom_1_dct = Jpeg.dct(chrom_1_blocks)
@@ -87,7 +87,11 @@ class Jpeg:
 
     @staticmethod
     def color_conversion(flattened_img, color_space):
-        return convert("sRGB", color_space, flattened_img, True)
+        return convert("sRGB", color_space, flattened_img)
+
+    @staticmethod
+    def color_conversion_inverse(flattened_img, color_space):
+        return convert(color_space, "sRGB", flattened_img)
 
     @staticmethod
     def downsample(image_layer, h_scale, w_scale):
@@ -99,7 +103,7 @@ class Jpeg:
         h, w = image_layer.shape
         new_size = (w // w_scale, h // h_scale)
         return cv.resize(image_layer, new_size, interpolation=cv.INTER_AREA)
-    
+
     @staticmethod
     def upsample(image_layer, target_shape):
         if not isinstance(image_layer, np.ndarray):
@@ -109,16 +113,18 @@ class Jpeg:
 
         new_size = (target_shape[1], target_shape[0])
         return cv.resize(image_layer, new_size, interpolation=cv.INTER_LINEAR)
-    
+
     @staticmethod
-    def block_split(image_layer):
+    def block_split(image_layer, color_space):
         edge_data = EdgeDetection.canny(image_layer)
         quad_tree = QuadTree(edge_data)
+
+        normalized_image = apply_normalization(color_space, image_layer, False)
 
         blocks = []
         for leaf in quad_tree.get_leaves():
             x, y, size = leaf.x, leaf.y, leaf.size
-            block = image_layer[y:y+size, x:x+size]
+            block = normalized_image[y:y+size, x:x+size]
 
             # Apply padding if necessary
             pad_height = size - block.shape[0]
