@@ -66,7 +66,7 @@ class Jpeg:
     }
 
 
-    def __init__(self, img: Image, layer_shape, color_space = 'YCoCg', quality = 80) -> None:
+    def __init__(self, img: Image, layer_shape, color_space = 'YCoCg', quality = 80, block_size_range = (4, 64)) -> None:
         if img is None and layer_shape is None:
             raise ValueError("Image and shape cannot be both None.")
         if img is not None:
@@ -77,12 +77,13 @@ class Jpeg:
 
         self.img = img
         self.layer_shape = layer_shape if img is None else img.original_shape[:2]
-        self.quality = quality
 
         self.settings = Jpeg.COMMON_SETTINGS[color_space]
         self.settings.update({
             'color_space': color_space,
             'layer_shapes': Jpeg._compute_downsampled_shape(self.layer_shape, self.settings['downsampling_ratio']),
+            'quality': quality,
+            'block_size_range': block_size_range,
         })
 
     def compress(self):
@@ -91,9 +92,9 @@ class Jpeg:
         img_color_converted = np.transpose(img_color_converted, (2, 0, 1))
 
         img_downsampled = Jpeg.downsample(img_color_converted, self.settings['layer_shapes'])
-        img_blocks = Jpeg.block_split(img_downsampled, self.settings['color_space'])
+        img_blocks = Jpeg.block_split(img_downsampled, self.settings['color_space'], self.settings['block_size_range'])
         img_dct = Jpeg.dct(img_blocks)
-        img_quantized = Jpeg.quantize(img_dct, self.settings['default_quantization_matrices'], self.quality)
+        img_quantized = Jpeg.quantize(img_dct, self.settings['default_quantization_matrices'], self.settings['quality'])
 
 
         #TODO to be continued
@@ -101,7 +102,7 @@ class Jpeg:
     def decompress(self, img_quantized):
         #TODO to be implemented
 
-        img_dct = Jpeg.dequantize(img_quantized, self.settings['default_quantization_matrices'], self.quality)
+        img_dct = Jpeg.dequantize(img_quantized, self.settings['default_quantization_matrices'], self.settings['quality'])
         img_blocks = Jpeg.inverse_dct(img_dct)
         img_downsampled = Jpeg.block_merge(img_blocks, self.settings['layer_shapes'], self.settings['color_space'])
 
@@ -111,7 +112,6 @@ class Jpeg:
 
         img = Jpeg.color_conversion_inverse(img_color_converted.get_flattened(), self.settings['color_space'])
         img = Image.from_array(img, img_color_converted.original_shape)
-
         return img
 
     @staticmethod
@@ -141,11 +141,11 @@ class Jpeg:
         return upsampled_layers
 
     @staticmethod
-    def block_split(image_layers, color_space):
+    def block_split(image_layers, color_space, block_size_range):
         img_blocks = []
         for i, image_layer in enumerate(image_layers):
             edge_data = EdgeDetection.canny(image_layer)
-            quad_tree = QuadTree(edge_data)
+            quad_tree = QuadTree(edge_data, block_size_range[1], block_size_range[0])
 
             reshaped_image_layer = np.empty((image_layer.size, len(image_layers)), dtype=image_layer.dtype)
             reshaped_image_layer[:, i] = image_layer.flatten()
