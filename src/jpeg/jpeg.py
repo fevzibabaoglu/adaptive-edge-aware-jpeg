@@ -42,11 +42,11 @@ class Jpeg:
 
     COMMON_SETTINGS = {
         'YCoCg': {
-            'downsampling_ratio': {
-                'lum': (1, 1),
-                'chrom_1': (2, 4),
-                'chrom_2': (2, 2),
-            },
+            'downsampling_ratio': np.array([
+                [1, 1], # lum (y)
+                [2, 4], # chrom_1 (co)
+                [2, 2], # chrom_2 (cg)
+            ]),
         },
     }
 
@@ -67,57 +67,32 @@ class Jpeg:
         self.settings = Jpeg.COMMON_SETTINGS[color_space]
         self.settings.update({
             'color_space': color_space,
-            'layer_shapes': {
-                'lum': Jpeg._compute_downsampled_shape(self.layer_shape, self.settings['downsampling_ratio']['lum']),
-                'chrom_1': Jpeg._compute_downsampled_shape(self.layer_shape, self.settings['downsampling_ratio']['chrom_1']),
-                'chrom_2': Jpeg._compute_downsampled_shape(self.layer_shape, self.settings['downsampling_ratio']['chrom_2']),
-            },
+            'layer_shapes': Jpeg._compute_downsampled_shape(self.layer_shape, self.settings['downsampling_ratio']),
         })
 
     def compress(self):
         img_color_converted = Jpeg.color_conversion(self.img.get_flattened(), self.settings['color_space'])
         img_color_converted = img_color_converted.reshape(self.img.original_shape)
+        img_color_converted = np.transpose(img_color_converted, (2, 0, 1))
 
-        lum, chrom_1, chrom_2 = img_color_converted[..., 0], img_color_converted[..., 1], img_color_converted[..., 2]
+        img_downsampled = Jpeg.downsample(img_color_converted, self.settings['layer_shapes'])
+        img_blocks = Jpeg.block_split(img_downsampled, self.settings['color_space'])
+        img_dct = Jpeg.dct(img_blocks)
+        img_quantized = Jpeg.quantize(img_dct, self.quality)
 
-        lum_downsampled = Jpeg.downsample(lum, *self.settings['downsampling_ratio']['lum'])
-        chrom_1_downsampled = Jpeg.downsample(chrom_1, *self.settings['downsampling_ratio']['chrom_1'])
-        chrom_2_downsampled = Jpeg.downsample(chrom_2, *self.settings['downsampling_ratio']['chrom_2'])
-
-        lum_blocks = Jpeg.block_split(lum_downsampled, self.settings['color_space'])
-        chrom_1_blocks = Jpeg.block_split(chrom_1_downsampled, self.settings['color_space'])
-        chrom_2_blocks = Jpeg.block_split(chrom_2_downsampled, self.settings['color_space'])
-
-        lum_dct = Jpeg.dct(lum_blocks)
-        chrom_1_dct = Jpeg.dct(chrom_1_blocks)
-        chrom_2_dct = Jpeg.dct(chrom_2_blocks)
-
-        lum_quantized = Jpeg.quantize(lum_dct, self.quality)
-        chrom_1_quantized = Jpeg.quantize(chrom_1_dct, self.quality)
-        chrom_2_quantized = Jpeg.quantize(chrom_2_dct, self.quality)
 
         #TODO to be continued
 
-    def decompress(self, lum_quantized, chrom_1_quantized, chrom_2_quantized):
+    def decompress(self, img_quantized):
         #TODO to be implemented
 
-        lum_dct = Jpeg.dequantize(lum_quantized, self.quality)
-        chrom_1_dct = Jpeg.dequantize(chrom_1_quantized, self.quality)
-        chrom_2_dct = Jpeg.dequantize(chrom_2_quantized, self.quality)
+        img_dct = Jpeg.dequantize(img_quantized, self.quality)
+        img_blocks = Jpeg.inverse_dct(img_dct)
+        img_downsampled = Jpeg.block_merge(img_blocks, self.settings['layer_shapes'], self.settings['color_space'])
 
-        lum_blocks = Jpeg.inverse_dct(lum_dct)
-        chrom_1_blocks = Jpeg.inverse_dct(chrom_1_dct)
-        chrom_2_blocks = Jpeg.inverse_dct(chrom_2_dct)
-
-        lum_downsampled = Jpeg.block_merge(lum_blocks, self.settings['color_space'], self.settings['layer_shapes']['lum'])
-        chrom_1_downsampled = Jpeg.block_merge(chrom_1_blocks, self.settings['color_space'], self.settings['layer_shapes']['chrom_1'])
-        chrom_2_downsampled = Jpeg.block_merge(chrom_2_blocks, self.settings['color_space'], self.settings['layer_shapes']['chrom_2'])
-
-        lum = Jpeg.upsample(lum_downsampled, self.layer_shape)
-        chrom_1 = Jpeg.upsample(chrom_1_downsampled, self.layer_shape)
-        chrom_2 = Jpeg.upsample(chrom_2_downsampled, self.layer_shape)
-
-        img_color_converted = Image.from_array(np.stack([lum, chrom_1, chrom_2], axis=2))
+        img_color_converted = Jpeg.upsample(img_downsampled, self.layer_shape)
+        img_color_converted = np.stack(img_color_converted, axis=2)
+        img_color_converted = Image.from_array(img_color_converted)
 
         img = Jpeg.color_conversion_inverse(img_color_converted.get_flattened(), self.settings['color_space'])
         img = Image.from_array(img, img_color_converted.original_shape)
@@ -133,98 +108,112 @@ class Jpeg:
         return convert(color_space, "sRGB", flattened_img)
 
     @staticmethod
-    def downsample(image_layer, h_scale, w_scale):
-        h, w = image_layer.shape
-        new_size = (w // w_scale, h // h_scale)
-        return cv.resize(image_layer, new_size, interpolation=cv.INTER_AREA)
+    def downsample(image_layers, target_shapes):
+        downsampled_layers = []
+        for i, layer in enumerate(image_layers):
+            target_size = (target_shapes[i][1], target_shapes[i][0])
+            downsampled_layer = cv.resize(layer, target_size, interpolation=cv.INTER_AREA)
+            downsampled_layers.append(downsampled_layer)
+        return downsampled_layers
 
     @staticmethod
-    def upsample(image_layer, target_shape):
-        new_size = (target_shape[1], target_shape[0])
-        return cv.resize(image_layer, new_size, interpolation=cv.INTER_LINEAR)
+    def upsample(image_layers, target_shape):
+        upsampled_layers = []
+        target_size = (target_shape[1], target_shape[0])
+        for i, layer in enumerate(image_layers):
+            upsampled_layer = cv.resize(layer, target_size, interpolation=cv.INTER_LINEAR)
+            upsampled_layers.append(upsampled_layer)
+        return upsampled_layers
 
     @staticmethod
-    def block_split(image_layer, color_space):
-        edge_data = EdgeDetection.canny(image_layer)
-        quad_tree = QuadTree(edge_data)
+    def block_split(image_layers, color_space):
+        img_blocks = []
+        for i, image_layer in enumerate(image_layers):
+            edge_data = EdgeDetection.canny(image_layer)
+            quad_tree = QuadTree(edge_data)
 
-        reshaped_image_layer = np.empty((image_layer.size, 3), dtype=image_layer.dtype)
-        reshaped_image_layer[:, 0] = image_layer.flatten()
-        normalized_image = apply_normalization(color_space, reshaped_image_layer, False)
-        normalized_image = normalized_image[:, 0].reshape(image_layer.shape)
+            reshaped_image_layer = np.empty((image_layer.size, 3), dtype=image_layer.dtype)
+            reshaped_image_layer[:, 0] = image_layer.flatten()
+            normalized_kayer = apply_normalization(color_space, reshaped_image_layer, False)
+            normalized_kayer = normalized_kayer[:, 0].reshape(image_layer.shape)
 
-        blocks = []
-        for leaf in quad_tree.get_leaves():
-            x, y, size = leaf.x, leaf.y, leaf.size
-            block = normalized_image[y:y+size, x:x+size]
+            blocks = []
+            for leaf in quad_tree.get_leaves():
+                x, y, size = leaf.x, leaf.y, leaf.size
+                block = normalized_kayer[y:y+size, x:x+size]
 
-            # Apply padding if necessary
-            pad_height = size - block.shape[0]
-            pad_width = size - block.shape[1]
-            block = np.pad(block, ((0, pad_height), (0, pad_width)), mode='reflect')
+                # Apply padding if necessary
+                pad_height = size - block.shape[0]
+                pad_width = size - block.shape[1]
+                block = np.pad(block, ((0, pad_height), (0, pad_width)), mode='reflect')
 
-            blocks.append(block)
-        return blocks
-
-    @staticmethod
-    def block_merge(blocks, color_space, shape):
-        # Initialize the matrix with zeros
-        H, W = shape
-        node_size = largest_power_of_2(max(H, W)) * 2
-        image_layer = np.zeros((node_size, node_size), dtype=np.float32)
-        leaves_deque = deque(blocks)
-
-        def rebuild_layer(x, y, node_size):
-            if not leaves_deque:
-                return
-            if x >= W or y >= H:
-                return
-            if node_size == 0:
-                return
-
-            current_leaf = leaves_deque[0]
-            leaf_size = current_leaf.shape[0]
-
-            # Check if the current region matches the leaf
-            if node_size == leaf_size:
-                image_layer[y:y+node_size, x:x+node_size] = current_leaf
-                leaves_deque.popleft()
-
-            # Split into quadrants
-            else:
-                child_node_size = node_size // 2
-                rebuild_layer(x, y, child_node_size)                                      # Top-left
-                rebuild_layer(x + child_node_size, y, child_node_size)                    # Top-right
-                rebuild_layer(x, y + child_node_size, child_node_size)                    # Bottom-left
-                rebuild_layer(x + child_node_size, y + child_node_size, child_node_size)  # Bottom-right
-
-        rebuild_layer(0, 0, node_size)
-        image_layer = image_layer[:H, :W]
-        reshaped_image_layer = np.empty((image_layer.size, 3), dtype=image_layer.dtype)
-        reshaped_image_layer[:, 0] = image_layer.flatten()
-        denormalized_image = apply_normalization(color_space, reshaped_image_layer, True)
-        denormalized_image = denormalized_image[:, 0].reshape(image_layer.shape)
-        return denormalized_image
+                blocks.append(block)
+            img_blocks.append(blocks)
+        return img_blocks
 
     @staticmethod
-    def dct(blocks):
-        return [cv.dct(block) for block in blocks]
+    def block_merge(img_blocks, layer_shapes, color_space):
+        img_denormalized = []
+        for i, blocks in enumerate(img_blocks):
+            # Initialize the matrix with zeros
+            H, W = layer_shapes[i]
+            node_size = largest_power_of_2(max(H, W)) * 2
+            image_layer = np.zeros((node_size, node_size), dtype=np.float32)
+            leaves_deque = deque(blocks)
+
+            def rebuild_layer(x, y, node_size):
+                if not leaves_deque:
+                    return
+                if x >= W or y >= H:
+                    return
+                if node_size == 0:
+                    return
+
+                current_leaf = leaves_deque[0]
+                leaf_size = current_leaf.shape[0]
+
+                # Check if the current region matches the leaf
+                if node_size == leaf_size:
+                    image_layer[y:y+node_size, x:x+node_size] = current_leaf
+                    leaves_deque.popleft()
+
+                # Split into quadrants
+                else:
+                    child_node_size = node_size // 2
+                    rebuild_layer(x, y, child_node_size)                                      # Top-left
+                    rebuild_layer(x + child_node_size, y, child_node_size)                    # Top-right
+                    rebuild_layer(x, y + child_node_size, child_node_size)                    # Bottom-left
+                    rebuild_layer(x + child_node_size, y + child_node_size, child_node_size)  # Bottom-right
+
+            rebuild_layer(0, 0, node_size)
+            image_layer = image_layer[:H, :W]
+            reshaped_image_layer = np.empty((image_layer.size, 3), dtype=image_layer.dtype)
+            reshaped_image_layer[:, 0] = image_layer.flatten()
+            denormalized_layer = apply_normalization(color_space, reshaped_image_layer, True)
+            denormalized_layer = denormalized_layer[:, 0].reshape(image_layer.shape)
+            img_denormalized.append(denormalized_layer)
+
+        return img_denormalized
 
     @staticmethod
-    def inverse_dct(blocks):
-        return [cv.idct(block) for block in blocks]
+    def dct(img_blocks):
+        return [[cv.dct(block) for block in blocks] for blocks in img_blocks]
 
     @staticmethod
-    def quantize(blocks, quality):
-        return [np.round(
+    def inverse_dct(img_blocks):
+        return [[cv.idct(block) for block in blocks] for blocks in img_blocks]
+
+    @staticmethod
+    def quantize(img_blocks, quality):
+        return [[np.round(
             block / Jpeg._get_quantization_matrix(block.shape[0], quality)
-        ).astype(np.int32) for block in blocks]
+        ).astype(np.int32) for block in blocks] for blocks in img_blocks]
 
     @staticmethod
-    def dequantize(blocks, quality):
-        return [(
+    def dequantize(img_blocks, quality):
+        return [[(
             block * Jpeg._get_quantization_matrix(block.shape[0], quality)
-        ).astype(np.float32) for block in blocks]
+        ).astype(np.float32) for block in blocks] for blocks in img_blocks]
 
     @staticmethod
     def _get_quantization_matrix(size, quality=80):
@@ -235,5 +224,5 @@ class Jpeg:
         return resized_matrix.astype(np.int32)
 
     @staticmethod
-    def _compute_downsampled_shape(layer_shape, downsampling_ratio):
-        return (layer_shape[0] // downsampling_ratio[0], layer_shape[1] // downsampling_ratio[1])
+    def _compute_downsampled_shape(layer_shapes, downsampling_ratios):
+        return layer_shapes // downsampling_ratios
