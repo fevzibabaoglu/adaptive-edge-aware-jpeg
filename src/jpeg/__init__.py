@@ -17,6 +17,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 
-__all__ = ['Jpeg']
+__all__ = ['Jpeg', 'JpegCompressionSettings']
 
-from .jpeg import Jpeg
+from .jpeg import Jpeg, JpegCompressionSettings
