@@ -29,7 +29,7 @@ from .utils import largest_power_of_2
 
 
 class Jpeg:
-    QUANTIZATION_MATRIX = np.array([
+    LUMINANCE_QUANTIZATION_MATRIX = np.array([
         [16, 11, 10, 16, 24, 40, 51, 61],
         [12, 12, 14, 19, 26, 58, 60, 55],
         [14, 13, 16, 24, 40, 57, 69, 56],
@@ -39,6 +39,16 @@ class Jpeg:
         [49, 64, 78, 87, 103, 121, 120, 101],
         [72, 92, 95, 98, 112, 100, 103, 99]
     ]).astype(np.float32)
+    CHROMINANCE_QUANTIZATION_MATRIX = np.array([
+        [17, 18, 24, 47, 99, 99, 99, 99],
+        [18, 21, 26, 66, 99, 99, 99, 99],
+        [24, 26, 56, 99, 99, 99, 99, 99],
+        [47, 66, 99, 99, 99, 99, 99, 99],
+        [99, 99, 99, 99, 99, 99, 99, 99],
+        [99, 99, 99, 99, 99, 99, 99, 99],
+        [99, 99, 99, 99, 99, 99, 99, 99],
+        [99, 99, 99, 99, 99, 99, 99, 99]
+    ]).astype(np.float32)
 
     COMMON_SETTINGS = {
         'YCoCg': {
@@ -47,6 +57,11 @@ class Jpeg:
                 [2, 4], # chrom_1 (co)
                 [2, 2], # chrom_2 (cg)
             ]),
+            'default_quantization_matrices': [
+                LUMINANCE_QUANTIZATION_MATRIX, 
+                CHROMINANCE_QUANTIZATION_MATRIX,
+                CHROMINANCE_QUANTIZATION_MATRIX,
+            ],
         },
     }
 
@@ -78,7 +93,7 @@ class Jpeg:
         img_downsampled = Jpeg.downsample(img_color_converted, self.settings['layer_shapes'])
         img_blocks = Jpeg.block_split(img_downsampled, self.settings['color_space'])
         img_dct = Jpeg.dct(img_blocks)
-        img_quantized = Jpeg.quantize(img_dct, self.quality)
+        img_quantized = Jpeg.quantize(img_dct, self.settings['default_quantization_matrices'], self.quality)
 
 
         #TODO to be continued
@@ -86,7 +101,7 @@ class Jpeg:
     def decompress(self, img_quantized):
         #TODO to be implemented
 
-        img_dct = Jpeg.dequantize(img_quantized, self.quality)
+        img_dct = Jpeg.dequantize(img_quantized, self.settings['default_quantization_matrices'], self.quality)
         img_blocks = Jpeg.inverse_dct(img_dct)
         img_downsampled = Jpeg.block_merge(img_blocks, self.settings['layer_shapes'], self.settings['color_space'])
 
@@ -204,21 +219,21 @@ class Jpeg:
         return [[cv.idct(block) for block in blocks] for blocks in img_blocks]
 
     @staticmethod
-    def quantize(img_blocks, quality):
+    def quantize(img_blocks, default_quantization_matrices, quality):
         return [[np.round(
-            block / Jpeg._get_quantization_matrix(block.shape[0], quality)
-        ).astype(np.int32) for block in blocks] for blocks in img_blocks]
+            block / Jpeg._get_quantization_matrix(default_quantization_matrices[i], block.shape[0], quality)
+        ).astype(np.int32) for block in blocks] for i, blocks in enumerate(img_blocks)]
 
     @staticmethod
-    def dequantize(img_blocks, quality):
+    def dequantize(img_blocks, default_quantization_matrices, quality):
         return [[(
-            block * Jpeg._get_quantization_matrix(block.shape[0], quality)
-        ).astype(np.float32) for block in blocks] for blocks in img_blocks]
+            block * Jpeg._get_quantization_matrix(default_quantization_matrices[i], block.shape[0], quality)
+        ).astype(np.float32) for block in blocks] for i, blocks in enumerate(img_blocks)]
 
     @staticmethod
-    def _get_quantization_matrix(size, quality=80):
+    def _get_quantization_matrix(default_quantization_matrix, size, quality=80):
         S = 5000 / quality if quality < 50 else 200 - 2 * quality
-        scaled_matrix = np.floor((S * Jpeg.QUANTIZATION_MATRIX + 50) / 100)
+        scaled_matrix = np.floor((S * default_quantization_matrix + 50) / 100)
         resized_matrix = cv.resize(scaled_matrix, (size, size), interpolation=cv.INTER_LINEAR)
         resized_matrix = np.clip(resized_matrix, 1, None)
         return resized_matrix.astype(np.int32)
