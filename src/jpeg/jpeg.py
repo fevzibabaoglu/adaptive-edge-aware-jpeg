@@ -231,7 +231,7 @@ class Jpeg:
         ).astype(np.float32) for block in blocks] for i, blocks in enumerate(img_blocks)]
 
     @staticmethod
-    def _get_quantization_matrix(default_quantization_matrix, size, quality=80):
+    def _get_quantization_matrix(default_quantization_matrix, size, quality):
         S = 5000 / quality if quality < 50 else 200 - 2 * quality
         scaled_matrix = np.floor((S * default_quantization_matrix + 50) / 100)
         resized_matrix = cv.resize(scaled_matrix, (size, size), interpolation=cv.INTER_LINEAR)
