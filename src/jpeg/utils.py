@@ -17,7 +17,16 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 
-__all__ = ['EdgeDetection', 'QuadTree']
+import math
+import numba as nb
 
-from .edge_detection import EdgeDetection
-from .quadtree import QuadTree
+
+@nb.njit(fastmath=True, cache=True)
+def largest_power_of_2(n):
+    """Returns the largest power of 2 less than `n`."""
+    if n <= 0:
+        raise ValueError("n must be positive.")
+    if n <= 2:
+        return n
+    # Largest power of 2 < n
+    return 2 ** math.floor(math.log2(n - 1))

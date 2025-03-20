@@ -20,7 +20,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import numba as nb
 import numpy as np
 
-from .common import _pq_eotf, _pq_inverse_eotf
+from .common import (
+    _pq_eotf, _pq_inverse_eotf, 
+    _normalize, _denormalize
+)
 from .xyz import XYZ
 
 
@@ -129,6 +132,10 @@ class ICaCb:
 
     # Transformation matrix from ICaCb to RGB'
     M_ICACB_TO_RGB_P = np.linalg.inv(M_RGB_P_TO_ICACB)
+
+    # Normalization values (target range: [-127, 127])
+    MIDPOINTS = np.array([0.07498085, 0.02180194, -0.018250957], dtype=np.float32)
+    SCALE_FACTORS = np.array([1693.7823, 1838.5665, 1330.3855], dtype=np.float32)
 
 
     @staticmethod

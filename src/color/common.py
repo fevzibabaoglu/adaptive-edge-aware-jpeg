@@ -25,7 +25,9 @@ __all__ = [
     '_srgb_to_linear_rgb',
     '_linear_rgb_to_srgb',
     '_pq_eotf',
-    '_pq_inverse_eotf'
+    '_pq_inverse_eotf',
+    '_normalize',
+    '_denormalize',
 ]
 
 
@@ -115,3 +117,11 @@ def _pq_inverse_eotf(
     num = c1 + c2 * tmp
     den = 1.0 + c3 * tmp
     return (num / den) ** m2
+
+@nb.njit(fastmath=True, cache=True)
+def _normalize(data, midpoint, scale_factor):
+    return (data - midpoint) * scale_factor
+
+@nb.njit(fastmath=True, cache=True)
+def _denormalize(scaled_data, midpoint, scale_factor):
+    return scaled_data / scale_factor + midpoint

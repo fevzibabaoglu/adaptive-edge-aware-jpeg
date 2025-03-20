@@ -17,6 +17,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 
-__all__ = ['get_color_spaces', 'convert', 'apply_normalization']
+__all__ = ['Jpeg', 'JpegCompressionSettings']
 
-from .conversion import get_color_spaces, convert, apply_normalization
+from .jpeg import Jpeg, JpegCompressionSettings
