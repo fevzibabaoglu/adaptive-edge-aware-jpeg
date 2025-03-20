@@ -147,15 +147,15 @@ class Jpeg:
             edge_data = EdgeDetection.canny(image_layer)
             quad_tree = QuadTree(edge_data)
 
-            reshaped_image_layer = np.empty((image_layer.size, 3), dtype=image_layer.dtype)
-            reshaped_image_layer[:, 0] = image_layer.flatten()
-            normalized_kayer = apply_normalization(color_space, reshaped_image_layer, False)
-            normalized_kayer = normalized_kayer[:, 0].reshape(image_layer.shape)
+            reshaped_image_layer = np.empty((image_layer.size, len(image_layers)), dtype=image_layer.dtype)
+            reshaped_image_layer[:, i] = image_layer.flatten()
+            normalized_layer = apply_normalization(color_space, reshaped_image_layer, False)
+            normalized_layer = normalized_layer[:, i].reshape(image_layer.shape)
 
             blocks = []
             for leaf in quad_tree.get_leaves():
                 x, y, size = leaf.x, leaf.y, leaf.size
-                block = normalized_kayer[y:y+size, x:x+size]
+                block = normalized_layer[y:y+size, x:x+size]
 
                 # Apply padding if necessary
                 pad_height = size - block.shape[0]
@@ -202,10 +202,10 @@ class Jpeg:
 
             rebuild_layer(0, 0, node_size)
             image_layer = image_layer[:H, :W]
-            reshaped_image_layer = np.empty((image_layer.size, 3), dtype=image_layer.dtype)
-            reshaped_image_layer[:, 0] = image_layer.flatten()
+            reshaped_image_layer = np.empty((image_layer.size, len(img_blocks)), dtype=image_layer.dtype)
+            reshaped_image_layer[:, i] = image_layer.flatten()
             denormalized_layer = apply_normalization(color_space, reshaped_image_layer, True)
-            denormalized_layer = denormalized_layer[:, 0].reshape(image_layer.shape)
+            denormalized_layer = denormalized_layer[:, i].reshape(image_layer.shape)
             img_denormalized.append(denormalized_layer)
 
         return img_denormalized
