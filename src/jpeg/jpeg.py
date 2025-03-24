@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 
 import cv2 as cv
+import math
 import numpy as np
 from collections import deque
 from typing import List, Optional, Tuple
@@ -57,7 +58,7 @@ class JpegCompressionSettings:
     # Color space settings
     COLOR_SPACE_SETTINGS = {
         'YCoCg': {
-            'downsampling_ratio': np.array([
+            'downsampling_ratios': np.array([
                 [1, 1],  # lum (y)
                 [2, 4],  # chrom_1 (co)
                 [2, 2],  # chrom_2 (cg)
@@ -73,26 +74,26 @@ class JpegCompressionSettings:
     def __init__(
         self, 
         color_space: str = 'YCoCg', 
-        quality: int = 80, 
+        quality_range: Tuple[int, int] = (40, 80), 
         block_size_range: Tuple[int, int] = (4, 64)
     ):
         """Initialize compression settings.
 
         Args:
             color_space (str): Color space to use for compression ('YCoCg', etc.).
-            quality (int): JPEG quality factor (1-99).
+            quality_range (tuple): JPEG quality factor (1-99) range.
             block_size_range (tuple): Min and max block sizes for adaptive blocking.
         """
         if color_space not in self.COLOR_SPACE_SETTINGS:
             raise ValueError(f"Unsupported color space: {color_space}")
 
         self.color_space = color_space
-        self.quality = quality
+        self.quality_range = quality_range
         self.block_size_range = block_size_range
         
         # Copy settings from the color space configuration
         color_space_config = self.COLOR_SPACE_SETTINGS[color_space]
-        self.downsampling_ratio = color_space_config['downsampling_ratio']
+        self.downsampling_ratios = color_space_config['downsampling_ratios']
         self.quantization_matrices = color_space_config['quantization_matrices']
 
 
@@ -127,10 +128,7 @@ class Jpeg:
         self.settings = settings or JpegCompressionSettings()
 
         # Compute layer shapes based on downsampling ratios
-        self.layer_shapes = Jpeg._compute_downsampled_shapes(
-            self.layer_shape, 
-            self.settings.downsampling_ratio
-        )
+        self.layer_shapes = self._compute_downsampled_shapes(self.layer_shape)
 
     def compress(self) -> Tuple[List[List[np.ndarray]], List[np.ndarray]]:
         """Compress the image.
@@ -301,9 +299,9 @@ class Jpeg:
             quantized_blocks = []
             for block in blocks:
                 qmatrix = Jpeg._get_quantization_matrix(
-                    self.settings.quantization_matrices[i], 
-                    block.shape[0], 
-                    self.settings.quality
+                    self.settings.quantization_matrices[i],
+                    block.shape[0],
+                    self._get_quality_factor(block.shape[0]),
                 )
                 quantized_block = np.round(block / qmatrix).astype(np.int32)
                 quantized_blocks.append(quantized_block)
@@ -320,9 +318,9 @@ class Jpeg:
             dequantized_blocks = []
             for block in blocks:
                 qmatrix = Jpeg._get_quantization_matrix(
-                    self.settings.quantization_matrices[i], 
-                    block.shape[0], 
-                    self.settings.quality
+                    self.settings.quantization_matrices[i],
+                    block.shape[0],
+                    self._get_quality_factor(block.shape[0]),
                 )
                 dequantized_block = (block * qmatrix).astype(np.float32)
                 dequantized_blocks.append(dequantized_block)
@@ -339,6 +337,18 @@ class Jpeg:
         """Entropy decode compressed data to coefficients."""
         raise NotImplementedError("Entropy decoding not yet implemented")
 
+    def _compute_downsampled_shapes(self, layer_shapes: Tuple[int, int]) -> np.ndarray:
+        """Compute downsampled shapes based on original shape and downsampling ratios."""
+        return layer_shapes // self.settings.downsampling_ratios
+
+    def _get_quality_factor(self, block_size: int) -> int:
+        """Get quality factor based on block size and quality range."""
+        min_block_size, max_block_size = self.settings.block_size_range
+        min_quality, max_quality = self.settings.quality_range
+        return int(min_quality + (max_quality - min_quality) * 
+                   (1 - math.log(block_size / min_block_size) / 
+                    math.log(max_block_size / min_block_size)))
+
     @staticmethod
     def _get_quantization_matrix(default_matrix: np.ndarray, size: int, quality: int) -> np.ndarray:
         """Get a scaled quantization matrix for the specified quality and size."""
@@ -347,8 +357,3 @@ class Jpeg:
         resized_matrix = cv.resize(scaled_matrix, (size, size), interpolation=cv.INTER_LINEAR)
         resized_matrix = np.clip(resized_matrix, 1, None)
         return resized_matrix.astype(np.int32)
-
-    @staticmethod
-    def _compute_downsampled_shapes(layer_shapes: Tuple[int, int], downsampling_ratios: np.ndarray) -> np.ndarray:
-        """Compute downsampled shapes based on original shape and downsampling ratios."""
-        return layer_shapes // downsampling_ratios
