@@ -9,6 +9,7 @@ class RangeSlider(tk.Canvas):
         self,
         parent: Any,
         on_change_callback: Callable,
+        on_update_callback: Callable,
         min_val: float = 0,
         max_val: float = 100,
         initial_min: float = 20,
@@ -28,6 +29,8 @@ class RangeSlider(tk.Canvas):
 
         Args:
             parent: Parent widget
+            on_change_callback: Function to call when values change
+            on_update_callback: Function to call when values actually update
             min_val: Minimum possible value
             max_val: Maximum possible value
             initial_min: Initial minimum selected value
@@ -41,7 +44,6 @@ class RangeSlider(tk.Canvas):
             handle_radius: Radius of handle circles
             track_height: Height of the slider track
             background: Canvas background color
-            on_change_callback: Function to call when values change
         """
         # Initialize the canvas
         super().__init__(
@@ -54,7 +56,8 @@ class RangeSlider(tk.Canvas):
         )
 
         # Store parameters as instance variables
-        self.callback = on_change_callback
+        self.change_callback = on_change_callback
+        self.update_callback = on_update_callback
         self.min_val = min_val
         self.max_val = max_val
         self.value_type = value_type
@@ -213,13 +216,18 @@ class RangeSlider(tk.Canvas):
             else:
                 self.max_pos = max(new_pos, self.min_pos)
 
-        self._draw_slider()
+        self._update_slider()
 
     def _on_release(self, event) -> None:
         """Handle mouse release events."""
         self.dragging = None
         self.config(cursor="")
-        self.callback(self.get_values())
+        self.update_callback(self.get_values())
+
+    def _update_slider(self) -> None:
+        """Update slider visuals."""
+        self._draw_slider()
+        self.change_callback(self.get_values())
 
     def get_values(self) -> Tuple[Union[int, float], Union[int, float]]:
         """Get the current selected range values."""
@@ -242,4 +250,4 @@ class RangeSlider(tk.Canvas):
         self.max_pos = self._value_to_pos(max_val)
 
         # Redraw
-        self._draw_slider()
+        self._update_slider()
