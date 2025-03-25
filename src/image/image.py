@@ -49,9 +49,12 @@ class Image:
     def get_flattened(self) -> np.ndarray:
         return self.data.reshape(-1, self.original_shape[-1])
 
-    def reshape(self, shape) -> np.ndarray:
+    def get_uint8(self) -> np.ndarray:
+        return (self.data * 255).astype(np.uint8)
+
+    def reshape(self, shape):
         self.data = self.data.reshape(shape)
-        return self.data
+        return self
 
     def __str__(self) -> str:
         return self.data.__str__()

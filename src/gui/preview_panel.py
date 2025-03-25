@@ -18,9 +18,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 
 import os
-from PIL import Image, ImageTk
+from PIL import Image as PILImage, ImageTk
+
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
+
+from image import Image
 
 
 class PreviewPanel:
@@ -45,7 +48,7 @@ class PreviewPanel:
 
         Args:
             parent: Parent tkinter widget
-            process_function: Function that processes images, takes PIL Image and returns Image
+            process_function: Function that processes images
             preview_path: Path to initial preview image
             title: Title for the panel frame
             canvas_bg: Background color for the canvas
@@ -138,13 +141,13 @@ class PreviewPanel:
 
         try:
             # Open the image file
-            original_img = Image.open(self.preview_path)
+            original_img = Image.load(self.preview_path)
 
             # Get display dimensions
             dimensions = self._get_display_dimensions()
 
             # Create thumbnail for display
-            img_display = original_img.copy()
+            img_display = PILImage.fromarray(original_img.get_uint8())
             img_display.thumbnail((
                 dimensions["width"],
                 dimensions["height"] // 2 - 20
@@ -166,14 +169,14 @@ class PreviewPanel:
 
         try:
             # Get original image and process it
-            original_img = Image.open(self.preview_path)
+            original_img = Image.load(self.preview_path)
             processed_img = self.process_function(original_img)
 
             # Prepare for display
             dimensions = self._get_display_dimensions()
 
             # Create thumbnail for display
-            processed_display = processed_img.copy()
+            processed_display = PILImage.fromarray(processed_img.get_uint8())
             processed_display.thumbnail((
                 dimensions["width"],
                 dimensions["height"] // 2 - 20
