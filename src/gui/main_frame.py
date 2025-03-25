@@ -25,27 +25,48 @@ from jpeg import Jpeg, JpegCompressionSettings
 
 
 class JpegApp:
-    """Application for customizing JPEG compression parameters."""
+    """GUI application for JPEG compression."""
 
     def __init__(
-            self,
-            root,
-            color_spaces=["YCbCr", "YCoCg", "OKLAB", "RGB", "HSV", "YUV"],
-            default_color_space="YCoCg",
-            quality_range=(1, 99),
-            default_quality_range=(20, 60),
-            block_size_range=(1, 8),
-            default_block_size_range=(2, 6),
-            filetypes=(
-                ("Image files", "*.jpg *.jpeg *.png *.bmp *.tiff"),
-                ("AJPG files", "*.ajpg"),
-                ("All files", "*.*"),
-            )
-        ):
+        self,
+        root,
+        # Available color space options
+        color_spaces=[
+            "YCbCr", "YCoCg", "YCoCg-R", "ICaCb",
+            "ICtCp", "JzAzBz", "OKLAB"
+        ],
+        default_color_space="YCoCg",
+        # Quality settings range
+        quality_range=(1, 99),
+        default_quality_range=(20, 60),
+        # Block size settings range
+        block_size_range=(1, 8),
+        default_block_size_range=(2, 6),
+        # File types for open/save dialogs
+        filetypes=(
+            ("Image files", "*.jpg *.jpeg *.png *.bmp *.tiff"),
+            ("AJPG files", "*.ajpg"),
+            ("All files", "*.*"),
+        )
+    ):
+        """
+        Initialize the JPEG customizer application.
+
+        Args:
+            root: Tkinter root window
+            color_spaces: List of available color spaces
+            default_color_space: Default selected color space
+            quality_range: Min and max possible quality values (tuple)
+            default_quality_range: Default selected quality range (tuple)
+            block_size_range: Min and max possible block size exponents (tuple)
+            default_block_size_range: Default selected block size exponents (tuple)
+            filetypes: File type options for file dialogs
+        """
+        # Setup main window
         self.root = root
         self.root.title("JPEG Algorithm Customizer")
 
-        # Initialize settings with defaults from parameters
+        # Initialize compression engine with default settings
         self.jpeg = Jpeg(JpegCompressionSettings(
             color_space=default_color_space,
             quality_range=default_quality_range,
@@ -53,11 +74,11 @@ class JpegApp:
         ))
         self.files = []
 
-        # Create main frame with padding
+        # Create main application frame
         self.main_frame = ttk.Frame(self.root, padding="10")
         self.main_frame.pack(fill='both', expand=True)
 
-        # Create control panel
+        # Setup the control panel (left side)
         self.control_panel = ControlPanel(
             self.main_frame,
             on_change_callback=self.update_settings,
@@ -73,7 +94,7 @@ class JpegApp:
         )
         self.control_panel.frame.pack(side='left', fill='y', padx=(0, 10))
 
-        # Create preview panel
+        # Setup the preview panel (right side)
         self.preview_panel = PreviewPanel(
             self.main_frame,
             process_function=self._process_preview,
@@ -82,44 +103,52 @@ class JpegApp:
         )
         self.preview_panel.frame.pack(side='right', fill='both', expand=True)
 
-        # Configure window size
+        # Configure window properties
         self.root.update_idletasks()
         self.root.geometry("")
         self.root.resizable(False, False)
 
     def update_settings(self, new_settings):
-        """Update application settings, refresh UI elements and update JPEG object."""
+        """Update compression settings based on user input."""
+        # Update the JPEG compression engine with new settings
         self.jpeg.update_settings(JpegCompressionSettings(
             new_settings['color_space'],
             (new_settings['quality_min'], new_settings['quality_max']),
             (new_settings['block_size_min'], new_settings['block_size_max']),
         ))
+        # Update selected files list
         self.files = new_settings['files']
 
     def _process_preview(self, img):
-        """Apply current settings to process the image for preview."""
+        """Process an image for preview using current compression settings."""
+        # Compress and then decompress the image to show compression effects
         quantized, _ = self.jpeg.compress(img)
         output_img, _ = self.jpeg.decompress(img.original_shape[:2], quantized)
         return output_img
 
     def encode_images(self):
-        """Encode the selected images with current settings into .ajpg format."""
-        file_count = len(self.files)
-
-        if file_count == 0:
-            messagebox.showwarning("No Files Selected", "Please select files to encode.")
+        """Encode selected images using current settings into .ajpg format."""
+        if not self.files:
+            messagebox.showwarning(
+                "No Files Selected",
+                "Please select files to encode."
+            )
             return
 
+        # TODO: Implement actual encoding logic here
         messagebox.showinfo("Info", "Encoding")
 
     def decode_images(self):
         """Decode selected .ajpg files back to standard image formats."""
         # Filter for .ajpg files only
         ajpg_files = [f for f in self.files if f.lower().endswith('.ajpg')]
-        file_count = len(ajpg_files)
 
-        if file_count == 0:
-            messagebox.showwarning("No AJPG Files", "Please select .ajpg files to decode.")
+        if not ajpg_files:
+            messagebox.showwarning(
+                "No AJPG Files",
+                "Please select .ajpg files to decode."
+            )
             return
 
+        # TODO: Implement actual decoding logic here
         messagebox.showinfo("Info", "Decoding")
