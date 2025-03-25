@@ -298,7 +298,7 @@ class ControlPanel:
             return
 
         # Call the encoding callback with settings
-        self.on_encode_callback(self.get_current_settings())
+        self.on_encode_callback()
 
     def _on_decode_click(self):
         """Handle decode button click."""
@@ -307,7 +307,7 @@ class ControlPanel:
             return
 
         # Call the decoding callback with settings
-        self.on_decode_callback(self.get_current_settings())
+        self.on_decode_callback()
 
     def get_current_settings(self):
         """Get all current settings as a dictionary."""

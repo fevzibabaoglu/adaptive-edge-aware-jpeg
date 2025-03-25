@@ -17,4 +17,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 
-__all__ = []
+__all__ = ['JpegApp']
+
+from .main_frame import JpegApp
