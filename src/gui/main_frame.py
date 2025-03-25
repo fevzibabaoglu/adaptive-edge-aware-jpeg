@@ -49,7 +49,7 @@ class JpegApp:
         self.jpeg = Jpeg(JpegCompressionSettings(
             color_space=default_color_space,
             quality_range=default_quality_range,
-            block_size_range=default_block_size_range,
+            block_size_range=[2 ** size for size in default_block_size_range],
         ))
         self.files = []
 
@@ -98,8 +98,9 @@ class JpegApp:
 
     def _process_preview(self, img):
         """Apply current settings to process the image for preview."""
-        print('Processing preview')
-        return img
+        quantized, _ = self.jpeg.compress(img)
+        output_img, _ = self.jpeg.decompress(img.original_shape[:2], quantized)
+        return output_img
 
     def encode_images(self):
         """Encode the selected images with current settings into .ajpg format."""
