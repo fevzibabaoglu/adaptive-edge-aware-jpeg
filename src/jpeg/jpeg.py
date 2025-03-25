@@ -351,9 +351,12 @@ class Jpeg:
         """Get quality factor based on block size and quality range."""
         min_block_size, max_block_size = self.settings.block_size_range
         min_quality, max_quality = self.settings.quality_range
-        return int(min_quality + (max_quality - min_quality) *
-                   (1 - math.log(block_size / min_block_size) /
-                    math.log(max_block_size / min_block_size)))
+        if min_block_size == max_block_size:
+            return int((min_quality + max_quality) / 2)
+        else:
+            return int(min_quality + (max_quality - min_quality) *
+                       (1 - math.log(block_size / min_block_size) /
+                        math.log(max_block_size / min_block_size)))
 
     @staticmethod
     def _get_quantization_matrix(default_matrix: np.ndarray, size: int, quality: int) -> np.ndarray:
