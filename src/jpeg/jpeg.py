@@ -72,9 +72,9 @@ class JpegCompressionSettings:
     }
 
     def __init__(
-        self, 
-        color_space: str = 'YCoCg', 
-        quality_range: Tuple[int, int] = (40, 80), 
+        self,
+        color_space: str = 'YCoCg',
+        quality_range: Tuple[int, int] = (40, 80),
         block_size_range: Tuple[int, int] = (4, 64)
     ):
         """Initialize compression settings.
@@ -90,7 +90,7 @@ class JpegCompressionSettings:
         self.color_space = color_space
         self.quality_range = quality_range
         self.block_size_range = block_size_range
-        
+
         # Copy settings from the color space configuration
         color_space_config = self.COLOR_SPACE_SETTINGS[color_space]
         self.downsampling_ratios = color_space_config['downsampling_ratios']
@@ -100,45 +100,47 @@ class JpegCompressionSettings:
 class Jpeg:
     """JPEG compression and decompression implementation with adaptive blocking."""
 
-    def __init__(
-        self, 
-        img: Optional[Image] = None, 
-        layer_shape: Optional[Tuple[int, int]] = None,
-        settings: Optional[JpegCompressionSettings] = None
-    ) -> None:
+    def __init__(self, settings: JpegCompressionSettings) -> None:
         """Initialize JPEG compressor/decompressor.
 
         Args:
-            img (Image): Input image to compress.
-            layer_shape (tuple): Shape of the image layers if no image is provided.
-            settings (JpegCompressionSettings): Compression settings or None to use defaults.
+            settings (JpegCompressionSettings): Compression settings.
         """
-        if img is None and layer_shape is None:
-            raise ValueError("Either image or layer shape must be provided.")
+        self.settings = settings
+        self.update_layer_shapes()
 
-        if img is not None:
-            if not isinstance(img, Image):
-                raise TypeError("Input must be an Image object.")
-            if img.data.ndim != 3:
-                raise ValueError("Input array must be a 3D.")
+    def update_settings(self, settings: JpegCompressionSettings) -> None:
+        """Update compression settings."""
+        self.settings = settings
+        self.update_layer_shapes()
 
-        # Store image and settings
-        self.img = img
-        self.layer_shape = layer_shape if img is None else img.original_shape[:2]
-        self.settings = settings or JpegCompressionSettings()
+    def update_layer_shapes(self, layer_shape: Optional[Tuple[int, int]] = None) -> None:
+        """Update layer shapes based on the original shape and downsampling ratios."""
+        if layer_shape is not None:
+            self.layer_shape = layer_shape
+        if hasattr(self, 'layer_shape'):
+            self.layer_shapes = self._compute_downsampled_shapes(self.layer_shape)
 
-        # Compute layer shapes based on downsampling ratios
-        self.layer_shapes = self._compute_downsampled_shapes(self.layer_shape)
-
-    def compress(self) -> Tuple[List[List[np.ndarray]], List[np.ndarray]]:
+    def compress(self, img: Image) -> Tuple[List[List[np.ndarray]], List[np.ndarray]]:
         """Compress the image.
-        
+
+        Args:
+            img (Image): Input image to compress.
+
         Returns:
             bytes: Compressed image data.
         """
+        if not isinstance(img, Image):
+            raise TypeError("Input must be an Image object.")
+        if img.data.ndim != 3:
+            raise ValueError("Input array must be a 3D.")
+
+        # Update layer shapes based on the original image shape
+        self.update_layer_shapes(img.original_shape[:2])
+
         # Convert color space
-        img_color_converted = self._convert_color_space(self.img.get_flattened())
-        img_color_converted = img_color_converted.reshape(self.img.original_shape)
+        img_color_converted = self._convert_color_space(img.get_flattened())
+        img_color_converted = img_color_converted.reshape(img.original_shape)
         img_color_converted = np.transpose(img_color_converted, (2, 0, 1))
 
         # Compression steps
@@ -153,15 +155,19 @@ class Jpeg:
         # img_encoded = self._entropy_encode(img_quantized)
         # return img_encoded
 
-    def decompress(self, img_quantized):
+    def decompress(self, layer_shape: Tuple[int, int], img_quantized):
         """Decompress encoded image.
-        
+
         Args:
+            layer_shape (tuple): Shape of the image layers if no image is provided.
             img_encoded (bytes): Encoded image data.
-            
+
         Returns:
             Image: Decompressed image.
         """
+        # Update layer shapes based on the original image shape
+        self.update_layer_shapes(layer_shape)
+
         # TODO: Implement entropy decoding
         # img_quantized = self._entropy_decode(img_encoded)
 
@@ -345,9 +351,12 @@ class Jpeg:
         """Get quality factor based on block size and quality range."""
         min_block_size, max_block_size = self.settings.block_size_range
         min_quality, max_quality = self.settings.quality_range
-        return int(min_quality + (max_quality - min_quality) * 
-                   (1 - math.log(block_size / min_block_size) / 
-                    math.log(max_block_size / min_block_size)))
+        if min_block_size == max_block_size:
+            return int((min_quality + max_quality) / 2)
+        else:
+            return int(min_quality + (max_quality - min_quality) *
+                       (1 - math.log(block_size / min_block_size) /
+                        math.log(max_block_size / min_block_size)))
 
     @staticmethod
     def _get_quantization_matrix(default_matrix: np.ndarray, size: int, quality: int) -> np.ndarray:
