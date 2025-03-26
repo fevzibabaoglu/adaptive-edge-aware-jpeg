@@ -147,10 +147,10 @@ class Jpeg:
 
         # Compression steps
         img_downsampled = self._downsample(img_color_converted)
-        img_blocks, bits_list, root_sizes = self._block_split(img_downsampled)
+        img_blocks, states_list, root_sizes = self._block_split(img_downsampled)
         img_dct = self._apply_dct(img_blocks)
         img_quantized = self._quantize(img_dct)
-        img_encoded = self._entropy_encode(img_quantized, bits_list, root_sizes)
+        img_encoded = self._entropy_encode(img_quantized, states_list, root_sizes)
         return img_encoded, img_downsampled
 
     def decompress(self, layer_shape: Tuple[int, int], img_encoded: bytes):
@@ -209,7 +209,7 @@ class Jpeg:
     def _block_split(self, image_layers: List[np.ndarray]) -> List[List[np.ndarray]]:
         """Split image layers into adaptive blocks based on edge detection."""
         img_blocks = []
-        bits_list = []
+        states_list = []
         root_sizes = []
         min_block_size, max_block_size = self.settings.block_size_range
 
@@ -219,8 +219,8 @@ class Jpeg:
             quad_tree = QuadTree(edge_data, max_block_size, min_block_size)
 
             # Get leaves and header
-            leaves, bits = quad_tree.get_leaves_and_bits()
-            bits_list.append(bits)
+            leaves, states = quad_tree.get_leaves_and_states()
+            states_list.append(states)
 
             # Save root size
             root_sizes.append(quad_tree.root.size)
@@ -247,7 +247,7 @@ class Jpeg:
 
             img_blocks.append(blocks)
 
-        return img_blocks, bits_list, root_sizes
+        return img_blocks, states_list, root_sizes
 
     def _block_merge(self, img_blocks: List[List[np.ndarray]]) -> List[np.ndarray]:
         """Merge blocks back into complete image layers."""
@@ -340,24 +340,26 @@ class Jpeg:
 
         return result
 
-    def _entropy_encode(self, img_blocks: List[List[np.ndarray]], bits_list: List[List[int]], root_sizes: List[int]) -> bytes:
+    def _entropy_encode(self, img_blocks: List[List[np.ndarray]], states_list: List[List[int]], root_sizes: List[int]) -> bytes:
         """Entropy encode quantized coefficients."""
         output = BytesIO()
 
         # Write the number of layers
-        num_layers = len(bits_list)
+        num_layers = len(img_blocks)
         output.write(num_layers.to_bytes(1, byteorder='big'))
 
-        for layer_idx, (bits, blocks) in enumerate(zip(bits_list, img_blocks)):
+        for layer_idx, (blocks, states) in enumerate(zip(img_blocks, states_list)):
             # Convert bit array to bytes
-            bytes_needed = (len(bits) + 7) // 8
-            byte_array = bytearray(bytes_needed)
-            for i, bit in enumerate(bits):
-                if bit:
-                    byte_array[i // 8] |= (1 << (7 - (i % 8)))
+            bits_string = ''.join(states)
+            byte_array = bytearray()
+            for i in range(0, len(bits_string), 8):
+                chunk = bits_string[i:i+8]
+                chunk = chunk.ljust(8, '0')
+                byte_value = int(chunk, 2)
+                byte_array.append(byte_value)
 
             # Write the bits length, root_size, and header data
-            bits_len = len(bits)
+            bits_len = len(bits_string)
             output.write(bits_len.to_bytes(4, byteorder='big'))
             output.write(root_sizes[layer_idx].to_bytes(4, byteorder='big'))
             output.write(byte_array)
@@ -397,20 +399,21 @@ class Jpeg:
             bits_len = int.from_bytes(input_stream.read(4), byteorder='big')
             root_size = int.from_bytes(input_stream.read(4), byteorder='big')
 
-            # Read header data
-            header_len = (bits_len + 7) // 8
-            header = input_stream.read(header_len)
+            # Read states header data
+            bytes_len = (bits_len + 7) // 8
+            byte_array = input_stream.read(bytes_len)
 
             # Convert bytes to bit array
-            bits = []
-            for byte in header:
-                for i in range(7, -1, -1):  # Process each bit from MSB to LSB
-                    if len(bits) < len(header) * 8:  # Avoid adding extra padding bits
-                        bits.append((byte >> i) & 1)
-            bits = bits[:bits_len]
+            states = []
+            for byte in byte_array:
+                binary_str = format(byte, '08b')
+                for i in range(0, 8, 2):
+                    two_bits = binary_str[i:i+2]
+                    states.append(int(two_bits, 2))
+            states = states[:(bits_len // 2)]
 
             # Encode header data
-            leaf_sizes = Jpeg._decode_leaf_sizes(bits, root_size)
+            leaf_sizes = Jpeg._decode_leaf_sizes(states, root_size)
 
             # Read compressed coefficients length and data
             compressed_len = int.from_bytes(input_stream.read(4), byteorder='big')
@@ -494,25 +497,30 @@ class Jpeg:
         return result
 
     @staticmethod
-    def _decode_leaf_sizes(bits, root_size):
+    def _decode_leaf_sizes(states, root_size):
         """Decode quadtree structure from the header and generate leaf sizes."""
         # Create leaf sizes by traversing the tree in the same order as encoding
         leaf_sizes = []
-        bit_index = 0
+        state_idx = 0
 
         def process_node(size):
-            nonlocal bit_index
-            if bit_index >= len(bits):
+            nonlocal state_idx
+            if state_idx >= len(states):
                 return
 
-            is_split = bits[bit_index]
-            bit_index += 1
+            state = states[state_idx]
+            state_idx += 1
 
-            if is_split == 0:  # Leaf node
+            # Leaf node
+            if state == 0:
                 leaf_sizes.append(size)
-            else:  # Internal node (split)
+            # No node
+            elif state == 2:
+                pass
+            # Internal node (split)
+            else:
                 half_size = size // 2
-                for _ in range(4):  # Quadtree has 4 children
+                for _ in range(4):
                     process_node(half_size)
 
         process_node(root_size)
