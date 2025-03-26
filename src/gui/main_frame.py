@@ -122,8 +122,8 @@ class JpegApp:
     def _process_preview(self, img):
         """Process an image for preview using current compression settings."""
         # Compress and then decompress the image to show compression effects
-        quantized, _ = self.jpeg.compress(img)
-        output_img, _ = self.jpeg.decompress(img.original_shape[:2], quantized)
+        encoded = self.jpeg.compress(img)
+        output_img = self.jpeg.decompress(encoded, img.original_shape[:2])
         return output_img
 
     def encode_images(self):

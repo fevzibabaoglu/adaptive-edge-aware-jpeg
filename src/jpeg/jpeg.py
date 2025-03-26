@@ -151,14 +151,14 @@ class Jpeg:
         img_dct = self._apply_dct(img_blocks)
         img_quantized = self._quantize(img_dct)
         img_encoded = self._entropy_encode(img_quantized, states_list, root_sizes)
-        return img_encoded, img_downsampled
+        return img_encoded
 
-    def decompress(self, layer_shape: Tuple[int, int], img_encoded: bytes):
+    def decompress(self, img_encoded: bytes, layer_shape: Tuple[int, int]):
         """Decompress encoded image.
 
         Args:
-            layer_shape (tuple): Shape of the image layers if no image is provided.
             img_encoded (bytes): Encoded image data.
+            layer_shape (tuple): Shape of the image layers.
 
         Returns:
             Image: Decompressed image.
@@ -179,7 +179,7 @@ class Jpeg:
         # Convert back to original color space
         img = self._convert_color_space_inverse(img_color_converted.get_flattened())
         img = Image.from_array(img, img_color_converted.original_shape)
-        return img, img_downsampled
+        return img
 
     def _convert_color_space(self, flattened_img: np.ndarray) -> np.ndarray:
         """Convert from sRGB to target color space."""
