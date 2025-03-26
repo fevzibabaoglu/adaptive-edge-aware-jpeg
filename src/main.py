@@ -17,8 +17,16 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 
+import tkinter as tk
+
+from gui import JpegApp
+
+
 def main():
-    pass
+    if __name__ == "__main__":
+        root = tk.Tk()
+        app = JpegApp(root)
+        root.mainloop()
 
 
 if __name__ == '__main__':

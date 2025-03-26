@@ -160,7 +160,10 @@ class PreviewPanel:
             self._render_divider(dimensions)
 
         except Exception as error:
-            self._display_error(f"Failed to load preview: {error}")
+            messagebox.showerror(
+                "Failed to load preview", 
+                f"{error}"
+            )
 
     def process_and_display(self):
         """Process the image and display the result."""
@@ -188,7 +191,10 @@ class PreviewPanel:
             self._render_processed_image(dimensions)
 
         except Exception as error:
-            self._display_error(f"Failed to process image: {error}")
+            messagebox.showerror(
+                "Failed to process image", 
+                f"{error}"
+            )
 
     def _ensure_image_exists(self):
         """Verify that the image file exists and is accessible."""
@@ -229,7 +235,3 @@ class PreviewPanel:
             fill="gray", width=2,
             tags="separator"
         )
-
-    def _display_error(self, message):
-        """Show an error message dialog to the user."""
-        messagebox.showerror("Error", message)

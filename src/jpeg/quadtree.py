@@ -87,45 +87,44 @@ class QuadTree:
         """
         if size <= 0:
             raise ValueError("Node size must be positive.")
-        if x > self.image.shape[1] or y > self.image.shape[0]:
-            raise ValueError("Coordinates are out of bounds.")
+        if x >= self.image.shape[1] or y >= self.image.shape[0]:
+            return None
 
-        region = self.image[y:y+size, x:x+size]
-        height, width = region.shape
         node = QuadNode(x, y, size)
+        region = self.image[y:y+size, x:x+size]
 
         if (size > self.max_size or (size > self.min_size and _has_edge(region))):
             # Split the region into four parts
             split_size = size // 2
-            right_exists = (width - split_size) > 0
-            bottom_exists = (height - split_size) > 0
 
-            # Top-left exists either way
+            # Top-left
             node.children.append(self._build_tree(x, y, split_size))
-            # If top-right exists
-            if right_exists:
-                node.children.append(self._build_tree(x + split_size, y, split_size))
-            # If bottom-left exists
-            if bottom_exists:
-                node.children.append(self._build_tree(x, y + split_size, split_size))
-            # If bottom-right exists
-            if right_exists and bottom_exists:
-                node.children.append(self._build_tree(x + split_size, y + split_size, split_size))
+            # Top-right
+            node.children.append(self._build_tree(x + split_size, y, split_size))
+            # Bottom-left
+            node.children.append(self._build_tree(x, y + split_size, split_size))
+            # Bottom-right
+            node.children.append(self._build_tree(x + split_size, y + split_size, split_size))
 
         return node
-    
-    def get_leaves(self):
-        """Returns all leaf nodes (final partitions)."""
-        leaves = []
-        self._collect_leaves(self.root, leaves)
-        return leaves
 
-    def _collect_leaves(self, node, leaves):
-        """Helper function to collect leaf nodes recursively."""
+    def get_leaves_and_states(self):
+        """Returns all leaf nodes and generates a state header for the quadtree structure."""
+        leaves = []
+        states = []
+        self._collect_leaves_and_states(self.root, leaves, states)
+        return leaves, states
+
+    def _collect_leaves_and_states(self, node, leaves, states):
+        """Helper function to collect leaf nodes and generate structure state header recursively."""
         if node is None:
+            states.append('10')  # 2 = no further splitting (no node)
             return
+
         if node.is_leaf():
+            states.append('00')  # 0 = no further splitting (leaf node)
             leaves.append(node)
-            return
-        for child in node.children:
-            self._collect_leaves(child, leaves)
+        else:
+            states.append('01')  # 1 = split (internal node)
+            for child in node.children:
+                self._collect_leaves_and_states(child, leaves, states)

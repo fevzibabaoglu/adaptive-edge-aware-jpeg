@@ -17,10 +17,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 
+import os
+
 from tkinter import ttk, messagebox
 
 from .control_panel import ControlPanel
 from .preview_panel import PreviewPanel
+from image import Image
 from jpeg import Jpeg, JpegCompressionSettings
 
 
@@ -43,11 +46,12 @@ class JpegApp:
         block_size_range=(1, 8),
         default_block_size_range=(2, 6),
         # File types for open/save dialogs
-        filetypes=(
+        image_filetypes=(
             ("Image files", "*.jpg *.jpeg *.png *.bmp *.tiff"),
+        ),
+        ajpg_filetypes=(
             ("AJPG files", "*.ajpg"),
-            ("All files", "*.*"),
-        )
+        ),
     ):
         """
         Initialize the JPEG customizer application.
@@ -60,7 +64,8 @@ class JpegApp:
             default_quality_range: Default selected quality range (tuple)
             block_size_range: Min and max possible block size exponents (tuple)
             default_block_size_range: Default selected block size exponents (tuple)
-            filetypes: File type options for file dialogs
+            image_filetypes: File type options for encode file dialogs
+            ajpg_filetypes: File type options for decode file dialogs
         """
         # Setup main window
         self.root = root
@@ -90,7 +95,7 @@ class JpegApp:
             default_quality_range=default_quality_range,
             block_size_range=block_size_range,
             default_block_size_range=default_block_size_range,
-            filetypes=filetypes,
+            filetypes=image_filetypes+ajpg_filetypes,
         )
         self.control_panel.frame.pack(side='left', fill='y', padx=(0, 10))
 
@@ -99,7 +104,7 @@ class JpegApp:
             self.main_frame,
             process_function=self._process_preview,
             preview_path='images/lena.png',
-            filetypes=filetypes,
+            filetypes=image_filetypes,
         )
         self.preview_panel.frame.pack(side='right', fill='both', expand=True)
 
@@ -122,21 +127,28 @@ class JpegApp:
     def _process_preview(self, img):
         """Process an image for preview using current compression settings."""
         # Compress and then decompress the image to show compression effects
-        quantized, _ = self.jpeg.compress(img)
-        output_img, _ = self.jpeg.decompress(img.original_shape[:2], quantized)
+        encoded = self.jpeg.compress(img)
+        output_img = self.jpeg.decompress(encoded, img.original_shape[:2])
         return output_img
 
     def encode_images(self):
         """Encode selected images using current settings into .ajpg format."""
-        if not self.files:
+        image_files = [f for f in self.files if not f.lower().endswith('.ajpg')]
+
+        if not image_files:
             messagebox.showwarning(
-                "No Files Selected",
-                "Please select files to encode."
+                "No Image Files Selected",
+                "Please select image files to encode."
             )
             return
 
-        # TODO: Implement actual encoding logic here
-        messagebox.showinfo("Info", "Encoding")
+        for img_file in image_files:
+            img = Image.load(img_file)
+            encoded = self.jpeg.compress(img)
+            with open(os.path.splitext(img_file)[0] + '.ajpg', 'wb') as f:
+                f.write(encoded)
+
+        messagebox.showinfo("Info", "All images encoded successfully.")
 
     def decode_images(self):
         """Decode selected .ajpg files back to standard image formats."""
@@ -145,10 +157,17 @@ class JpegApp:
 
         if not ajpg_files:
             messagebox.showwarning(
-                "No AJPG Files",
+                "No AJPG Files Selected",
                 "Please select .ajpg files to decode."
             )
             return
 
-        # TODO: Implement actual decoding logic here
-        messagebox.showinfo("Info", "Decoding")
+        for ajpg_file in ajpg_files:
+            with open(ajpg_file, 'rb') as f:
+                encoded = f.read()
+            output_img = self.jpeg.decompress(encoded, None)
+            Image.save(output_img, os.path.splitext(ajpg_file)[0] + '.png')
+
+        # TODO: Get the layer_shape from the encoded data
+
+        messagebox.showinfo("Info", "All images decoded successfully.")
