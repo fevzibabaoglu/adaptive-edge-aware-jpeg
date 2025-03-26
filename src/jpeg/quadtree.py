@@ -113,19 +113,23 @@ class QuadTree:
                 node.children.append(self._build_tree(x + split_size, y + split_size, split_size))
 
         return node
-    
-    def get_leaves(self):
-        """Returns all leaf nodes (final partitions)."""
-        leaves = []
-        self._collect_leaves(self.root, leaves)
-        return leaves
 
-    def _collect_leaves(self, node, leaves):
-        """Helper function to collect leaf nodes recursively."""
+    def get_leaves_and_bits(self):
+        """Returns all leaf nodes and generates a bits header for the quadtree structure."""
+        leaves = []
+        bits = []
+        self._collect_leaves_and_bits(self.root, leaves, bits)
+        return leaves, bits
+
+    def _collect_leaves_and_bits(self, node, leaves, bits):
+        """Helper function to collect leaf nodes and generate structure bits recursively."""
         if node is None:
             return
+
         if node.is_leaf():
+            bits.append(0)  # 0 = no further splitting (leaf node)
             leaves.append(node)
-            return
-        for child in node.children:
-            self._collect_leaves(child, leaves)
+        else:
+            bits.append(1)  # 1 = split (internal node)
+            for child in node.children:
+                self._collect_leaves_and_bits(child, leaves, bits)

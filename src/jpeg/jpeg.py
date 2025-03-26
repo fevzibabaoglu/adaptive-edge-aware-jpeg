@@ -20,7 +20,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import cv2 as cv
 import math
 import numpy as np
+import zlib
 from collections import deque
+from io import BytesIO
 from typing import List, Optional, Tuple
 
 from color import apply_normalization, convert
@@ -145,17 +147,13 @@ class Jpeg:
 
         # Compression steps
         img_downsampled = self._downsample(img_color_converted)
-        img_blocks = self._block_split(img_downsampled)
+        img_blocks, bits_list, root_sizes = self._block_split(img_downsampled)
         img_dct = self._apply_dct(img_blocks)
         img_quantized = self._quantize(img_dct)
+        img_encoded = self._entropy_encode(img_quantized, bits_list, root_sizes)
+        return img_encoded, img_downsampled
 
-        return img_quantized, img_downsampled
-
-        # TODO: Implement entropy encoding
-        # img_encoded = self._entropy_encode(img_quantized)
-        # return img_encoded
-
-    def decompress(self, layer_shape: Tuple[int, int], img_quantized):
+    def decompress(self, layer_shape: Tuple[int, int], img_encoded: bytes):
         """Decompress encoded image.
 
         Args:
@@ -168,10 +166,8 @@ class Jpeg:
         # Update layer shapes based on the original image shape
         self.update_layer_shapes(layer_shape)
 
-        # TODO: Implement entropy decoding
-        # img_quantized = self._entropy_decode(img_encoded)
-
         # Decompression steps
+        img_quantized = self._entropy_decode(img_encoded)
         img_dct = self._dequantize(img_quantized)
         img_blocks = self._apply_inverse_dct(img_dct)
         img_downsampled = self._block_merge(img_blocks)
@@ -213,12 +209,21 @@ class Jpeg:
     def _block_split(self, image_layers: List[np.ndarray]) -> List[List[np.ndarray]]:
         """Split image layers into adaptive blocks based on edge detection."""
         img_blocks = []
+        bits_list = []
+        root_sizes = []
         min_block_size, max_block_size = self.settings.block_size_range
 
         for i, image_layer in enumerate(image_layers):
             # Detect edges to guide adaptive blocking
             edge_data = EdgeDetection.canny(image_layer)
             quad_tree = QuadTree(edge_data, max_block_size, min_block_size)
+
+            # Get leaves and header
+            leaves, bits = quad_tree.get_leaves_and_bits()
+            bits_list.append(bits)
+
+            # Save root size
+            root_sizes.append(quad_tree.root.size)
 
             # Normalize layer values
             reshaped_layer = np.empty((image_layer.size, len(image_layers)), dtype=image_layer.dtype)
@@ -228,7 +233,7 @@ class Jpeg:
 
             # Extract blocks from the normalized layer
             blocks = []
-            for leaf in quad_tree.get_leaves():
+            for leaf in leaves:
                 x, y, size = leaf.x, leaf.y, leaf.size
                 block = normalized_layer[y:y+size, x:x+size]
 
@@ -242,7 +247,7 @@ class Jpeg:
 
             img_blocks.append(blocks)
 
-        return img_blocks
+        return img_blocks, bits_list, root_sizes
 
     def _block_merge(self, img_blocks: List[List[np.ndarray]]) -> List[np.ndarray]:
         """Merge blocks back into complete image layers."""
@@ -335,13 +340,100 @@ class Jpeg:
 
         return result
 
-    def _entropy_encode(self, img_blocks: List[List[np.ndarray]]) -> bytes:
+    def _entropy_encode(self, img_blocks: List[List[np.ndarray]], bits_list: List[List[int]], root_sizes: List[int]) -> bytes:
         """Entropy encode quantized coefficients."""
-        raise NotImplementedError("Entropy encoding not yet implemented")
+        output = BytesIO()
+
+        # Write the number of layers
+        num_layers = len(bits_list)
+        output.write(num_layers.to_bytes(1, byteorder='big'))
+
+        for layer_idx, (bits, blocks) in enumerate(zip(bits_list, img_blocks)):
+            # Convert bit array to bytes
+            bytes_needed = (len(bits) + 7) // 8
+            byte_array = bytearray(bytes_needed)
+            for i, bit in enumerate(bits):
+                if bit:
+                    byte_array[i // 8] |= (1 << (7 - (i % 8)))
+
+            # Write the bits length, root_size, and header data
+            bits_len = len(bits)
+            output.write(bits_len.to_bytes(4, byteorder='big'))
+            output.write(root_sizes[layer_idx].to_bytes(4, byteorder='big'))
+            output.write(byte_array)
+
+            # Apply zigzag ordering to each block
+            zigzagged_blocks = []
+            for block in blocks:
+                h, w = block.shape
+                zigzagged = np.zeros(h * w, dtype=np.int32)
+                indices = Jpeg._zigzag_ordering(h, w)
+                for i, (y, x) in enumerate(indices):
+                    zigzagged[i] = block[y, x]
+                zigzagged_blocks.append(zigzagged)
+
+            # Compress zigzagged blocks
+            all_coeffs = np.concatenate(zigzagged_blocks)
+            coeff_bytes = all_coeffs.tobytes()
+            compressed_data = zlib.compress(coeff_bytes, level=9)
+
+            # Write compressed data length and data
+            compressed_len = len(compressed_data)
+            output.write(compressed_len.to_bytes(4, byteorder='big'))
+            output.write(compressed_data)
+
+        return output.getvalue()
 
     def _entropy_decode(self, encoded_data: bytes) -> List[List[np.ndarray]]:
         """Entropy decode compressed data to coefficients."""
-        raise NotImplementedError("Entropy decoding not yet implemented")
+        input_stream = BytesIO(encoded_data)
+        img_blocks = []
+
+        # Read the number of layers
+        num_layers = int.from_bytes(input_stream.read(1), byteorder='big')
+
+        for _ in range(num_layers):
+            # Read header length and root size
+            bits_len = int.from_bytes(input_stream.read(4), byteorder='big')
+            root_size = int.from_bytes(input_stream.read(4), byteorder='big')
+
+            # Read header data
+            header_len = (bits_len + 7) // 8
+            header = input_stream.read(header_len)
+
+            # Convert bytes to bit array
+            bits = []
+            for byte in header:
+                for i in range(7, -1, -1):  # Process each bit from MSB to LSB
+                    if len(bits) < len(header) * 8:  # Avoid adding extra padding bits
+                        bits.append((byte >> i) & 1)
+            bits = bits[:bits_len]
+
+            # Encode header data
+            leaf_sizes = Jpeg._decode_leaf_sizes(bits, root_size)
+
+            # Read compressed coefficients length and data
+            compressed_len = int.from_bytes(input_stream.read(4), byteorder='big')
+            compressed_data = input_stream.read(compressed_len)
+
+            # Decompress zigzagged blocks
+            uncompressed_data = zlib.decompress(compressed_data)
+            all_coeffs = np.frombuffer(uncompressed_data, dtype=np.int32)
+            zigzagged_blocks = np.split(all_coeffs, np.cumsum([s*s for s in leaf_sizes[:-1]]))
+
+            # Apply inverse zigzag ordering
+            blocks = []
+            for size, block_coeffs in zip(leaf_sizes, zigzagged_blocks):
+                block = np.zeros((size, size), dtype=np.int32)
+                indices = Jpeg._zigzag_ordering(size, size)
+                for i, (y, x) in enumerate(indices):
+                    if i < len(block_coeffs):
+                        block[y, x] = block_coeffs[i]
+                blocks.append(block)
+            
+            img_blocks.append(blocks)
+
+        return img_blocks
 
     def _compute_downsampled_shapes(self, layer_shapes: Tuple[int, int]) -> np.ndarray:
         """Compute downsampled shapes based on original shape and downsampling ratios."""
@@ -366,3 +458,62 @@ class Jpeg:
         resized_matrix = cv.resize(scaled_matrix, (size, size), interpolation=cv.INTER_LINEAR)
         resized_matrix = np.clip(resized_matrix, 1, None)
         return resized_matrix.astype(np.int32)
+    
+    @staticmethod
+    def _zigzag_ordering(h, w):
+        """Generate zigzag ordering indices for an nxn block."""
+        if not isinstance(h, int) or not isinstance(w, int) or h < 0 or w < 0:
+            raise ValueError("Block size must be an non-negative integer")
+
+        result = []
+        row, col = 0, 0
+
+        for _ in range(h * w):
+            result.append((row, col))
+
+            # Moving up and right
+            if (row + col) % 2 == 0:
+                if col == w - 1: # Reached right edge, go down
+                    row += 1
+                elif row == 0: # Reached top edge, go right
+                    col += 1
+                else: # Move diagonally up and right
+                    row -= 1
+                    col += 1
+
+            # Moving down and left
+            else:
+                if row == h - 1: # Reached bottom edge, go right
+                    col += 1
+                elif col == 0: # Reached left edge, go down
+                    row += 1
+                else: # Move diagonally down and left
+                    row += 1
+                    col -= 1
+
+        return result
+
+    @staticmethod
+    def _decode_leaf_sizes(bits, root_size):
+        """Decode quadtree structure from the header and generate leaf sizes."""
+        # Create leaf sizes by traversing the tree in the same order as encoding
+        leaf_sizes = []
+        bit_index = 0
+
+        def process_node(size):
+            nonlocal bit_index
+            if bit_index >= len(bits):
+                return
+
+            is_split = bits[bit_index]
+            bit_index += 1
+
+            if is_split == 0:  # Leaf node
+                leaf_sizes.append(size)
+            else:  # Internal node (split)
+                half_size = size // 2
+                for _ in range(4):  # Quadtree has 4 children
+                    process_node(half_size)
+
+        process_node(root_size)
+        return leaf_sizes
