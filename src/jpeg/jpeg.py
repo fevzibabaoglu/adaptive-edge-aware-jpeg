@@ -123,7 +123,7 @@ class Jpeg:
         if hasattr(self, 'layer_shape'):
             self.layer_shapes = self._compute_downsampled_shapes(self.layer_shape)
 
-    def compress(self, img: Image) -> Tuple[List[List[np.ndarray]], List[np.ndarray]]:
+    def compress(self, img: Image) -> bytes:
         """Compress the image.
 
         Args:
@@ -153,7 +153,7 @@ class Jpeg:
         img_encoded = self._entropy_encode(img_quantized, states_list, root_sizes)
         return img_encoded
 
-    def decompress(self, img_encoded: bytes, layer_shape: Tuple[int, int]):
+    def decompress(self, img_encoded: bytes, layer_shape: Tuple[int, int]) -> Image:
         """Decompress encoded image.
 
         Args:

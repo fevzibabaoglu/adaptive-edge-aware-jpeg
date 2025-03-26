@@ -49,7 +49,7 @@ COLOR_CLASSES = {
         JzAzBz.MIDPOINTS,
         JzAzBz.SCALE_FACTORS,
     ),
-    'SYCC': (
+    'YCbCr': (
         SYCC.srgb_to_sycc, 
         SYCC.sycc_to_srgb,
         SYCC.MIDPOINTS,
