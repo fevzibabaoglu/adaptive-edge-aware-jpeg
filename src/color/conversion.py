@@ -23,6 +23,7 @@ from .common import _normalize, _denormalize
 from .icacb import ICaCb
 from .ictcp import ICtCp
 from .jzazbz import JzAzBz
+from .oklab import OKLAB
 from .sycc import SYCC
 from .xyz import XYZ
 from .ycocg import YCoCg
@@ -71,7 +72,13 @@ COLOR_CLASSES = {
         YCoCg.srgb_to_ycocg_r, 
         YCoCg.ycocg_r_to_srgb,
         YCoCg.YCOCG_R_MIDPOINTS,
-        YCoCg.YCOCG_R_SCALE_FACTORS
+        YCoCg.YCOCG_R_SCALE_FACTORS,
+    ),
+    'OKLAB': (
+        OKLAB.srgb_to_oklab, 
+        OKLAB.oklab_to_srgb, 
+        OKLAB.MIDPOINTS, 
+        OKLAB.SCALE_FACTORS,
     ),
 }
 
