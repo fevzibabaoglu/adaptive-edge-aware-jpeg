@@ -177,4 +177,4 @@ class JpegApp:
         with open(filename, 'rb') as f:
             encoded = f.read()
         img = Jpeg(JpegCompressionSettings()).decompress(encoded)
-        Image.save(img, f'{os.path.splitext(filename)[0]}.{img.extension}')
+        Image.save(img, f'{os.path.splitext(filename)[0]}{img.extension}')
