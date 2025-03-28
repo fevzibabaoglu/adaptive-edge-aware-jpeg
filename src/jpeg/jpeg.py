@@ -60,6 +60,66 @@ class JpegCompressionSettings:
 
     # Color space settings
     COLOR_SPACE_SETTINGS = {
+        'ICaCb': {
+            'downsampling_ratios': np.array([
+                [1, 1],  # I
+                [1, 1],  # ca
+                [1, 1],  # cb
+            ]),
+            'quantization_matrices': [
+                LUMINANCE_QUANTIZATION_MATRIX,
+                CHROMINANCE_QUANTIZATION_MATRIX,
+                CHROMINANCE_QUANTIZATION_MATRIX,
+            ],
+        },
+        'ICtCp': {
+            'downsampling_ratios': np.array([
+                [1, 1],  # I
+                [1, 1],  # ct
+                [1, 1],  # cp
+            ]),
+            'quantization_matrices': [
+                LUMINANCE_QUANTIZATION_MATRIX,
+                CHROMINANCE_QUANTIZATION_MATRIX,
+                CHROMINANCE_QUANTIZATION_MATRIX,
+            ],
+        },
+        'JzAzBz': {
+            'downsampling_ratios': np.array([
+                [1, 1],  # jz
+                [1, 1],  # az
+                [1, 1],  # bz
+            ]),
+            'quantization_matrices': [
+                LUMINANCE_QUANTIZATION_MATRIX,
+                CHROMINANCE_QUANTIZATION_MATRIX,
+                CHROMINANCE_QUANTIZATION_MATRIX,
+            ],
+        },
+        'OKLAB': {
+            'downsampling_ratios': np.array([
+                [1, 1],  # l
+                [1, 1],  # a
+                [1, 1],  # b
+            ]),
+            'quantization_matrices': [
+                LUMINANCE_QUANTIZATION_MATRIX,
+                CHROMINANCE_QUANTIZATION_MATRIX,
+                CHROMINANCE_QUANTIZATION_MATRIX,
+            ],
+        },
+        'YCbCr': {
+            'downsampling_ratios': np.array([
+                [1, 1],  # lum (y)
+                [2, 2],  # chrom_1 (cb)
+                [2, 2],  # chrom_2 (cr)
+            ]),
+            'quantization_matrices': [
+                LUMINANCE_QUANTIZATION_MATRIX,
+                CHROMINANCE_QUANTIZATION_MATRIX,
+                CHROMINANCE_QUANTIZATION_MATRIX,
+            ],
+        },
         'YCoCg': {
             'downsampling_ratios': np.array([
                 [1, 1],  # lum (y)
@@ -72,7 +132,20 @@ class JpegCompressionSettings:
                 CHROMINANCE_QUANTIZATION_MATRIX,
             ],
         },
+        'YCoCg-R': {
+            'downsampling_ratios': np.array([
+                [1, 1],  # lum (y)
+                [2, 4],  # chrom_1 (co)
+                [2, 2],  # chrom_2 (cg)
+            ]),
+            'quantization_matrices': [
+                LUMINANCE_QUANTIZATION_MATRIX,
+                CHROMINANCE_QUANTIZATION_MATRIX,
+                CHROMINANCE_QUANTIZATION_MATRIX,
+            ],
+        },
     }
+
 
     def __init__(
         self,
