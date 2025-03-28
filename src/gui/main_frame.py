@@ -128,7 +128,7 @@ class JpegApp:
         """Process an image for preview using current compression settings."""
         # Compress and then decompress the image to show compression effects
         encoded = self.jpeg.compress(img)
-        output_img = self.jpeg.decompress(encoded, img.original_shape[:2])
+        output_img = self.jpeg.decompress(encoded)
         return output_img
 
     def encode_images(self):
@@ -143,8 +143,7 @@ class JpegApp:
             return
 
         for img_file in image_files:
-            img = Image.load(img_file)
-            encoded = self.jpeg.compress(img)
+            encoded = self._compress_image(img_file)
             with open(os.path.splitext(img_file)[0] + '.ajpg', 'wb') as f:
                 f.write(encoded)
 
@@ -163,11 +162,19 @@ class JpegApp:
             return
 
         for ajpg_file in ajpg_files:
-            with open(ajpg_file, 'rb') as f:
-                encoded = f.read()
-            output_img = self.jpeg.decompress(encoded, None)
-            Image.save(output_img, os.path.splitext(ajpg_file)[0] + '.png')
-
-        # TODO: Get the layer_shape from the encoded data
+            self._decompress_image(ajpg_file)
 
         messagebox.showinfo("Info", "All images decoded successfully.")
+
+    def _compress_image(self, filename):
+        """Compress the selected image using current settings."""
+        img = Image.load(filename)
+        encoded = self.jpeg.compress(img)
+        return encoded
+
+    def _decompress_image(self, filename):
+        """Decompress the selected image using image metadata."""
+        with open(filename, 'rb') as f:
+            encoded = f.read()
+        img = Jpeg(JpegCompressionSettings()).decompress(encoded)
+        Image.save(img, f'{os.path.splitext(filename)[0]}.{img.extension}')

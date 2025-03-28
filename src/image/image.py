@@ -19,18 +19,20 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import imageio.v3 as iio
 import numpy as np
+import os
 
 
 class Image:
-    def __init__(self, data, shape):
+    def __init__(self, data, shape, extension):
         self.data: np.ndarray = data
         self.original_shape = shape
+        self.extension = extension
 
     @classmethod
-    def from_array(cls, data, shape=None):
+    def from_array(cls, data, shape=None, extension=None):
         if shape is None:
             shape = data.shape
-        img = cls(data, shape)
+        img = cls(data, shape, extension)
         if shape is not None:
             img.reshape(shape)
         return img
@@ -38,10 +40,11 @@ class Image:
     @classmethod
     def load(cls, path):
         img = iio.imread(path, mode="RGB").astype(np.float32) / 255.0
-        return cls(img, img.shape)
+        extension = os.path.splitext(path)[1]
+        return cls(img, img.shape, extension)
 
     def copy(self):
-        return Image.from_array(self.data.copy(), self.original_shape)
+        return Image.from_array(self.data.copy(), self.original_shape, self.extension)
 
     def save(self, path):
         iio.imwrite(path, (self.data * 255).astype(np.uint8))

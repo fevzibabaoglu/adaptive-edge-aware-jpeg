@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 
 import cv2 as cv
+import json
 import math
 import numpy as np
 import zlib
@@ -140,6 +141,9 @@ class Jpeg:
         # Update layer shapes based on the original image shape
         self.update_layer_shapes(img.original_shape[:2])
 
+        # Save the extension
+        self.extension = img.extension
+
         # Convert color space
         img_color_converted = self._convert_color_space(img.get_flattened())
         img_color_converted = img_color_converted.reshape(img.original_shape)
@@ -153,19 +157,15 @@ class Jpeg:
         img_encoded = self._entropy_encode(img_quantized, states_list, root_sizes)
         return img_encoded
 
-    def decompress(self, img_encoded: bytes, layer_shape: Tuple[int, int]) -> Image:
+    def decompress(self, img_encoded: bytes) -> Image:
         """Decompress encoded image.
 
         Args:
             img_encoded (bytes): Encoded image data.
-            layer_shape (tuple): Shape of the image layers.
 
         Returns:
             Image: Decompressed image.
         """
-        # Update layer shapes based on the original image shape
-        self.update_layer_shapes(layer_shape)
-
         # Decompression steps
         img_quantized = self._entropy_decode(img_encoded)
         img_dct = self._dequantize(img_quantized)
@@ -178,7 +178,7 @@ class Jpeg:
 
         # Convert back to original color space
         img = self._convert_color_space_inverse(img_color_converted.get_flattened())
-        img = Image.from_array(img, img_color_converted.original_shape)
+        img = Image.from_array(img, img_color_converted.original_shape, self.extension)
         return img
 
     def _convert_color_space(self, flattened_img: np.ndarray) -> np.ndarray:
@@ -344,9 +344,23 @@ class Jpeg:
         """Entropy encode quantized coefficients."""
         output = BytesIO()
 
-        # Write the number of layers
-        num_layers = len(img_blocks)
-        output.write(num_layers.to_bytes(1, byteorder='big'))
+        # Write metadata
+        metadata = {
+            'height': self.layer_shape[0],
+            'width': self.layer_shape[1],
+            'num_layers': len(img_blocks),
+            'color_space': self.settings.color_space,
+            'quality_min': self.settings.quality_range[0],
+            'quality_max': self.settings.quality_range[1],
+            'block_size_min': self.settings.block_size_range[0],
+            'block_size_max': self.settings.block_size_range[1],
+            'extension': self.extension,
+        }
+        metadata_json = json.dumps(metadata)
+        metadata_bytes = metadata_json.encode("utf-8")
+        metadata_length = len(metadata_bytes)
+        output.write(metadata_length.to_bytes(4, byteorder="big"))
+        output.write(metadata_bytes)
 
         for layer_idx, (blocks, states) in enumerate(zip(img_blocks, states_list)):
             # Convert bit array to bytes
@@ -391,8 +405,22 @@ class Jpeg:
         input_stream = BytesIO(encoded_data)
         img_blocks = []
 
-        # Read the number of layers
-        num_layers = int.from_bytes(input_stream.read(1), byteorder='big')
+        # Read metadata
+        metadata_length = int.from_bytes(input_stream.read(4), byteorder='big')
+        metadata_bytes = input_stream.read(metadata_length)
+        metadata_json = metadata_bytes.decode("utf-8")
+        metadata = json.loads(metadata_json)
+
+        # Set metadata
+        layer_shape = metadata['height'], metadata['width']
+        num_layers = metadata['num_layers']
+        self.settings.color_space = metadata['color_space']
+        self.settings.quality_range = metadata['quality_min'], metadata['quality_max']
+        self.settings.block_size_range = metadata['block_size_min'], metadata['block_size_max']
+        self.extension = metadata['extension']
+
+        # Update layer shapes based on the original image shape
+        self.update_layer_shapes(layer_shape)
 
         for _ in range(num_layers):
             # Read header length and root size
