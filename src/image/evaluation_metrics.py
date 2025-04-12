@@ -37,6 +37,13 @@ class EvaluationMetrics:
         self.original_image = original_image
         self.compressed_image = compressed_image
 
+    def psnr(self):
+        return piq.psnr(
+            EvaluationMetrics._image_to_tensor(self.original_image),
+            EvaluationMetrics._image_to_tensor(self.compressed_image),
+            data_range=1.0,
+        )
+
     def ssim(self):
         gray_original = cv.cvtColor(self.original_image.get_uint8(), cv.COLOR_RGB2GRAY)
         gray_compressed = cv.cvtColor(self.compressed_image.get_uint8(), cv.COLOR_RGB2GRAY)
