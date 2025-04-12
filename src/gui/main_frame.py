@@ -110,8 +110,12 @@ class JpegApp:
 
         # Configure window properties
         self.root.update_idletasks()
-        self.root.geometry("")
         self.root.resizable(False, False)
+
+        # Set the window position
+        x_position = (self.root.winfo_screenwidth() - self.root.winfo_width()) // 2
+        y_position = (self.root.winfo_screenheight() - self.root.winfo_height()) // 2
+        self.root.geometry(f"+{x_position}+{y_position}")
 
     def update_settings(self, new_settings):
         """Update compression settings based on user input."""
