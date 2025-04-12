@@ -23,7 +23,7 @@ from PIL import Image as PILImage, ImageTk
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
-from image import Image
+from image import EvaluationMetrics, Image
 
 
 class PreviewPanel:
@@ -68,6 +68,9 @@ class PreviewPanel:
         # Image holders
         self.original_image = None
         self.processed_image = None
+
+        # Metrics text holder
+        self.metrics_text = ""
 
         # Create UI and setup
         self._setup_ui()
@@ -150,7 +153,7 @@ class PreviewPanel:
             img_display = PILImage.fromarray(original_img.get_uint8())
             img_display.thumbnail((
                 dimensions["width"],
-                dimensions["height"] // 2 - 20
+                dimensions["image_height"] - 20
             ))
             self.original_image = ImageTk.PhotoImage(img_display)
 
@@ -175,6 +178,16 @@ class PreviewPanel:
             original_img = Image.load(self.preview_path)
             processed_img = self.process_function(original_img)
 
+            # Calculate metrics
+            eval = EvaluationMetrics(original_img, processed_img)
+            psnr_val = eval.psnr()
+            ssim_val = eval.ssim()
+            ms_ssim_val = eval.ms_ssim()
+            lpips_val = eval.lpips()
+
+            # Format metrics text
+            self.metrics_text = f"PSNR: {psnr_val:.4f}    SSIM: {ssim_val:.4f}    MS-SSIM: {ms_ssim_val:.4f}    LPIPS: {lpips_val:.4f}"
+
             # Prepare for display
             dimensions = self._get_display_dimensions()
 
@@ -182,13 +195,15 @@ class PreviewPanel:
             processed_display = PILImage.fromarray(processed_img.get_uint8())
             processed_display.thumbnail((
                 dimensions["width"],
-                dimensions["height"] // 2 - 20
+                dimensions["image_height"] - 20
             ))
             self.processed_image = ImageTk.PhotoImage(processed_display)
 
             # Update display
             self.canvas.delete("processed")
+            self.canvas.delete("metrics")
             self._render_processed_image(dimensions)
+            self._render_metrics(dimensions)
 
         except Exception as error:
             messagebox.showerror(
@@ -202,16 +217,25 @@ class PreviewPanel:
 
     def _get_display_dimensions(self):
         """Get current canvas dimensions for layout calculations."""
+        width = self.canvas.winfo_width() or 400
+        height = self.canvas.winfo_height() or 300
+
+        # Reserve space for metrics text at the bottom
+        metrics_height = 20  # Height reserved for metrics text
+        image_height = (height - metrics_height) // 2
+
         return {
-            "width": self.canvas.winfo_width() or 400,
-            "height": self.canvas.winfo_height() or 300
+            "width": width,
+            "height": height,
+            "image_height": image_height,
+            "metrics_height": metrics_height
         }
 
     def _render_original_image(self, dimensions):
         """Render the original image on the top half of the canvas."""
         self.canvas.create_image(
             dimensions["width"] // 2,
-            dimensions["height"] // 4,
+            dimensions["image_height"] // 2,
             image=self.original_image,
             anchor='center',
             tags="original"
@@ -221,17 +245,29 @@ class PreviewPanel:
         """Render the processed image on the bottom half of the canvas."""
         self.canvas.create_image(
             dimensions["width"] // 2,
-            3 * dimensions["height"] // 4,
+            3 * dimensions["image_height"] // 2,
             image=self.processed_image,
             anchor='center',
             tags="processed"
         )
 
+    def _render_metrics(self, dimensions):
+        """Render the evaluation metrics on the canvas."""
+        self.canvas.create_text(
+            dimensions["width"] // 2,
+            dimensions["height"] - (dimensions["metrics_height"] // 2),
+            text=self.metrics_text,
+            anchor='center',
+            fill="black",
+            font=("Arial", 9),
+            tags="metrics"
+        )
+
     def _render_divider(self, dimensions):
         """Render a separator line between original and processed images."""
         self.canvas.create_line(
-            0, dimensions["height"] // 2,
-            dimensions["width"], dimensions["height"] // 2,
+            0, dimensions["image_height"],
+            dimensions["width"], dimensions["image_height"],
             fill="gray", width=2,
             tags="separator"
         )
