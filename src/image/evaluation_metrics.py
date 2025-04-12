@@ -18,15 +18,21 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 
 import cv2 as cv
+import lpips
 import numpy as np
 import piq
 import torch
+import warnings
 from typing import Union
 
 from .image import Image
 
 
 class EvaluationMetrics:
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=UserWarning)
+        loss_fn = lpips.LPIPS(net='alex')
+
     def __init__(self, original_image, compressed_image):
         self.original_image = original_image
         self.compressed_image = compressed_image
@@ -47,6 +53,20 @@ class EvaluationMetrics:
             EvaluationMetrics._image_to_tensor(self.compressed_image),
             data_range=1.0,
         )
+
+    def lpips(self):
+        original_tensor = EvaluationMetrics._image_to_tensor(self.original_image)
+        compressed_tensor = EvaluationMetrics._image_to_tensor(self.compressed_image)
+
+        # Convert from [0, 1] to [-1, 1] as required by LPIPS
+        original_tensor = original_tensor * 2 - 1
+        compressed_tensor = compressed_tensor * 2 - 1
+
+        # Calculate LPIPS
+        with torch.no_grad():
+            lpips_value = EvaluationMetrics.loss_fn(original_tensor, compressed_tensor)
+
+        return lpips_value.item()
 
     @staticmethod
     def _image_to_tensor(image: Union[Image, np.ndarray]) -> torch.Tensor:
