@@ -20,10 +20,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import numba as nb
 import numpy as np
 
-from .common import (
-    _pq_eotf, _pq_inverse_eotf, 
-    _normalize, _denormalize
-)
+from .common import _pq_eotf, _pq_inverse_eotf
 from .xyz import XYZ
 
 
