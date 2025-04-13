@@ -176,7 +176,7 @@ class PreviewPanel:
         try:
             # Get original image and process it
             original_img = Image.load(self.preview_path)
-            processed_img = self.process_function(original_img)
+            processed_img, compression_ratio = self.process_function(original_img)
 
             # Calculate metrics
             eval = EvaluationMetrics(original_img, processed_img)
@@ -186,7 +186,8 @@ class PreviewPanel:
             lpips_val = eval.lpips()
 
             # Format metrics text
-            self.metrics_text = f"PSNR: {psnr_val:.4f}    SSIM: {ssim_val:.4f}    MS-SSIM: {ms_ssim_val:.4f}    LPIPS: {lpips_val:.4f}"
+            self.metrics_text = f"PSNR: {psnr_val:.4f}    SSIM: {ssim_val:.4f}    MS-SSIM: {ms_ssim_val:.4f}    LPIPS: {lpips_val:.4f}\n" \
+                                f"Compression Ratio: {compression_ratio:.2f}x"
 
             # Prepare for display
             dimensions = self._get_display_dimensions()
@@ -221,7 +222,7 @@ class PreviewPanel:
         height = self.canvas.winfo_height() or 300
 
         # Reserve space for metrics text at the bottom
-        metrics_height = 20  # Height reserved for metrics text
+        metrics_height = 40  # Height reserved for metrics text
         image_height = (height - metrics_height) // 2
 
         return {

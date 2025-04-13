@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 
 import os
+from PIL import Image as PILImage
 
 from tkinter import ttk, messagebox
 
@@ -133,7 +134,13 @@ class JpegApp:
         # Compress and then decompress the image to show compression effects
         encoded = self.jpeg.compress(img)
         output_img = self.jpeg.decompress(encoded)
-        return output_img
+
+        # Calculate compression ratio
+        uncompressed_size = len(PILImage.fromarray(img.get_uint8()).tobytes())
+        compressed_size = len(encoded)
+        compression_ratio = uncompressed_size / compressed_size
+
+        return output_img, compression_ratio
 
     def encode_images(self):
         """Encode selected images using current settings into .ajpg format."""
