@@ -154,9 +154,13 @@ class JpegApp:
             return
 
         for img_file in image_files:
-            encoded = self._compress_image(img_file)
-            with open(os.path.splitext(img_file)[0] + '.ajpg', 'wb') as f:
-                f.write(encoded)
+            try:
+                self._compress_image(img_file)
+            except Exception as e:
+                messagebox.showwarning(
+                    "Error processing image",
+                    f"{e}"
+                )
 
         messagebox.showinfo("Info", "All images encoded successfully.")
 
@@ -173,7 +177,13 @@ class JpegApp:
             return
 
         for ajpg_file in ajpg_files:
-            self._decompress_image(ajpg_file)
+            try:
+                self._decompress_image(ajpg_file)
+            except Exception as e:
+                messagebox.showwarning(
+                    "Error processing image",
+                    f"{e}"
+                )
 
         messagebox.showinfo("Info", "All images decoded successfully.")
 
@@ -181,7 +191,8 @@ class JpegApp:
         """Compress the selected image using current settings."""
         img = Image.load(filename)
         encoded = self.jpeg.compress(img)
-        return encoded
+        with open(os.path.splitext(filename)[0] + '.ajpg', 'wb') as f:
+            f.write(encoded)
 
     def _decompress_image(self, filename):
         """Decompress the selected image using image metadata."""
