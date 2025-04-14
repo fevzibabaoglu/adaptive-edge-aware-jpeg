@@ -39,8 +39,19 @@ class Image:
 
     @classmethod
     def load(cls, path):
-        img = iio.imread(path, mode="RGB").astype(np.float32) / 255.0
         extension = os.path.splitext(path)[1]
+        img = iio.imread(path).astype(np.float32) / 255.0
+
+        
+        if img.ndim == 2:                           # Grayscale
+            img = np.stack((img,) * 3, axis=-1)
+        elif img.ndim == 3 and img.shape[2] == 3:   # RGB
+            pass
+        elif img.ndim == 3 and img.shape[2] == 4:   # RGBA
+            img = img[:, :, :3]
+        else:
+            raise ValueError(f"Unsupported image format: {img.shape}")
+
         return cls(img, img.shape, extension)
 
     def copy(self):
