@@ -20,7 +20,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import os
 
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+from tkinter import ttk, filedialog
 
 from .range_slider import RangeSlider
 
@@ -241,7 +241,7 @@ class ControlPanel:
         encode_btn = ttk.Button(
             button_frame,
             text="Encode",
-            command=self._on_encode_click
+            command=self.on_encode_callback
         )
         encode_btn.pack(side='left', expand=True, fill='x', padx=(0, 5))
 
@@ -249,7 +249,7 @@ class ControlPanel:
         decode_btn = ttk.Button(
             button_frame,
             text="Decode",
-            command=self._on_decode_click
+            command=self.on_decode_callback
         )
         decode_btn.pack(side='right', expand=True, fill='x', padx=(5, 0))
 
@@ -290,24 +290,6 @@ class ControlPanel:
     def _on_combo_selected(self, event):
         """Handle combobox selection and clear highlight."""
         self.color_combo.selection_clear()
-
-    def _on_encode_click(self):
-        """Handle encode button click."""
-        if not self.selected_files:
-            messagebox.showinfo("Error", "Please select at least one image first.")
-            return
-
-        # Call the encoding callback with settings
-        self.on_encode_callback()
-
-    def _on_decode_click(self):
-        """Handle decode button click."""
-        if not self.selected_files:
-            messagebox.showinfo("Error", "Please select at least one image first.")
-            return
-
-        # Call the decoding callback with settings
-        self.on_decode_callback()
 
     def get_current_settings(self):
         """Get all current settings as a dictionary."""
