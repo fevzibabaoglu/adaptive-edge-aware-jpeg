@@ -65,8 +65,8 @@ class JpegApp:
             default_quality_range: Default selected quality range (tuple)
             block_size_range: Min and max possible block size exponents (tuple)
             default_block_size_range: Default selected block size exponents (tuple)
-            image_filetypes: File type options for encode file dialogs
-            ajpg_filetypes: File type options for decode file dialogs
+            image_filetypes: File type options for compress file dialogs
+            ajpg_filetypes: File type options for decompress file dialogs
         """
         # Setup main window
         self.root = root
@@ -88,8 +88,8 @@ class JpegApp:
         self.control_panel = ControlPanel(
             self.main_frame,
             on_change_callback=self.update_settings,
-            on_encode_callback=self.encode_images,
-            on_decode_callback=self.decode_images,
+            on_compress_callback=self.compress_images,
+            on_decompress_callback=self.decompress_images,
             color_spaces=color_spaces,
             default_color_space=default_color_space,
             quality_range=quality_range,
@@ -132,24 +132,24 @@ class JpegApp:
     def _process_preview(self, img):
         """Process an image for preview using current compression settings."""
         # Compress and then decompress the image to show compression effects
-        encoded = self.jpeg.compress(img)
-        output_img = self.jpeg.decompress(encoded)
+        compressed = self.jpeg.compress(img)
+        output_img = self.jpeg.decompress(compressed)
 
         # Calculate compression ratio
         uncompressed_size = len(PILImage.fromarray(img.get_uint8()).tobytes())
-        compressed_size = len(encoded)
+        compressed_size = len(compressed)
         compression_ratio = uncompressed_size / compressed_size
 
         return output_img, compression_ratio
 
-    def encode_images(self):
-        """Encode selected images using current settings into .ajpg format."""
+    def compress_images(self):
+        """Compress selected images using current settings into .ajpg format."""
         image_files = [f for f in self.files if not f.lower().endswith('.ajpg')]
 
         if not image_files:
             messagebox.showwarning(
                 "No Image Files Selected",
-                "Please select image files to encode."
+                "Please select image files to compress."
             )
             return
 
@@ -162,17 +162,17 @@ class JpegApp:
                     f"{e}"
                 )
 
-        messagebox.showinfo("Info", "All images encoded successfully.")
+        messagebox.showinfo("Info", "All images compressed successfully.")
 
-    def decode_images(self):
-        """Decode selected .ajpg files back to standard image formats."""
+    def decompress_images(self):
+        """Decompress selected .ajpg files back to standard image formats."""
         # Filter for .ajpg files only
         ajpg_files = [f for f in self.files if f.lower().endswith('.ajpg')]
 
         if not ajpg_files:
             messagebox.showwarning(
                 "No AJPG Files Selected",
-                "Please select .ajpg files to decode."
+                "Please select .ajpg files to decompress."
             )
             return
 
@@ -185,18 +185,18 @@ class JpegApp:
                     f"{e}"
                 )
 
-        messagebox.showinfo("Info", "All images decoded successfully.")
+        messagebox.showinfo("Info", "All images decompressed successfully.")
 
     def _compress_image(self, filename):
         """Compress the selected image using current settings."""
         img = Image.load(filename)
-        encoded = self.jpeg.compress(img)
+        compressed = self.jpeg.compress(img)
         with open(os.path.splitext(filename)[0] + '.ajpg', 'wb') as f:
-            f.write(encoded)
+            f.write(compressed)
 
     def _decompress_image(self, filename):
         """Decompress the selected image using image metadata."""
         with open(filename, 'rb') as f:
-            encoded = f.read()
-        img = Jpeg(JpegCompressionSettings()).decompress(encoded)
+            compressed = f.read()
+        img = Jpeg(JpegCompressionSettings()).decompress(compressed)
         Image.save(img, f'{os.path.splitext(filename)[0]}{img.extension}')

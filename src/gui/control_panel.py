@@ -32,8 +32,8 @@ class ControlPanel:
         self,
         parent,
         on_change_callback,
-        on_encode_callback,
-        on_decode_callback,
+        on_compress_callback,
+        on_decompress_callback,
         color_spaces=["YCbCr", "YCoCg", "OKLAB", "RGB", "HSV", "YUV"],
         default_color_space="YCoCg",
         quality_range=(1, 99),
@@ -60,8 +60,8 @@ class ControlPanel:
         Args:
             parent: Parent tkinter widget
             on_change_callback: Function called whenever any setting changes
-            on_encode_callback: Function called when encode button is clicked
-            on_decode_callback: Function called when decode button is clicked
+            on_compress_callback: Function called when compress button is clicked
+            on_decompress_callback: Function called when decompress button is clicked
             color_spaces: List of available color spaces
             default_color_space: Default selected color space
             quality_range: Tuple of (min, max) for quality slider
@@ -81,8 +81,8 @@ class ControlPanel:
         # Store parameters
         self.parent = parent
         self.on_change_callback = on_change_callback
-        self.on_encode_callback = on_encode_callback
-        self.on_decode_callback = on_decode_callback
+        self.on_compress_callback = on_compress_callback
+        self.on_decompress_callback = on_decompress_callback
         self.filetypes = filetypes
         self.slider_config = {
             "width": slider_width,
@@ -233,30 +233,30 @@ class ControlPanel:
         )
 
     def _create_action_buttons(self):
-        """Create action buttons (Encode, Decode)."""
+        """Create action buttons (Compress, Decompress)."""
         button_frame = ttk.Frame(self.frame)
         button_frame.pack(fill='x', pady=10)
 
-        # Encode button
-        encode_btn = ttk.Button(
+        # Compress button
+        compress_btn = ttk.Button(
             button_frame,
-            text="Encode",
-            command=self.on_encode_callback
+            text="Compress",
+            command=self.on_compress_callback
         )
-        encode_btn.pack(side='left', expand=True, fill='x', padx=(0, 5))
+        compress_btn.pack(side='left', expand=True, fill='x', padx=(0, 5))
 
-        # Decode button
-        decode_btn = ttk.Button(
+        # Decompress button
+        decompress_btn = ttk.Button(
             button_frame,
-            text="Decode",
-            command=self.on_decode_callback
+            text="Decompress",
+            command=self.on_decompress_callback
         )
-        decode_btn.pack(side='right', expand=True, fill='x', padx=(5, 0))
+        decompress_btn.pack(side='right', expand=True, fill='x', padx=(5, 0))
 
         # File type info
         ttk.Label(
             self.frame,
-            text="Encoded files will be saved as .ajpg",
+            text="Compressed files will be saved as .ajpg",
             font=('', 8)
         ).pack(anchor='w', pady=(5, 0))
 
