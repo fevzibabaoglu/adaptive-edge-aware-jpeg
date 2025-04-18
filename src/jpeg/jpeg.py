@@ -513,7 +513,7 @@ class Jpeg:
                     states.append(int(two_bits, 2))
             states = states[:(bits_len // 2)]
 
-            # Encode header data
+            # Decode header data
             leaf_sizes = Jpeg._decode_leaf_sizes(states, root_size)
 
             # Read compressed coefficients length and data
