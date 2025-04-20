@@ -140,7 +140,7 @@ if __name__ == "__main__":
     img_files = [path for path in img_dir.rglob('*') if path.is_file() and path.suffix in img_extensions]
 
     # Set result file path
-    result_file = Path('images_test/compression_results.csv')
+    result_file = Path('test_results/compression_results.csv')
 
     # Define color spaces
     color_spaces = get_color_spaces()
