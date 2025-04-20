@@ -21,7 +21,8 @@ import numpy as np
 import time
 import unittest
 
-from src.color import convert, get_color_spaces
+from color import convert, get_color_spaces
+
 
 class TestColorConversions(unittest.TestCase):
     @classmethod
