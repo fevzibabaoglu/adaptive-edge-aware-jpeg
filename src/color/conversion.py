@@ -50,6 +50,12 @@ COLOR_CLASSES = {
         JzAzBz.MIDPOINTS,
         JzAzBz.SCALE_FACTORS,
     ),
+    'OKLAB': (
+        OKLAB.srgb_to_oklab, 
+        OKLAB.oklab_to_srgb, 
+        OKLAB.MIDPOINTS, 
+        OKLAB.SCALE_FACTORS,
+    ),
     'YCbCr': (
         SYCC.srgb_to_sycc, 
         SYCC.sycc_to_srgb,
@@ -74,12 +80,6 @@ COLOR_CLASSES = {
         YCoCg.YCOCG_R_MIDPOINTS,
         YCoCg.YCOCG_R_SCALE_FACTORS,
     ),
-    'OKLAB': (
-        OKLAB.srgb_to_oklab, 
-        OKLAB.oklab_to_srgb, 
-        OKLAB.MIDPOINTS, 
-        OKLAB.SCALE_FACTORS,
-    ),
 }
 
 
@@ -90,7 +90,7 @@ def get_color_spaces() -> list:
     Returns:
         list: A list of available color spaces.
     """
-    return list(COLOR_CLASSES.keys())
+    return list(set(COLOR_CLASSES) - {'sRGB'})
 
 def convert(from_space: str, to_space: str, data: np.ndarray) -> np.ndarray:
     """
