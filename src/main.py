@@ -25,7 +25,7 @@ from gui import JpegApp
 def main():
     if __name__ == "__main__":
         root = tk.Tk()
-        app = JpegApp(root)
+        JpegApp(root)
         root.mainloop()
 
 
