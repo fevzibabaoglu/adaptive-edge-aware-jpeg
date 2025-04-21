@@ -20,7 +20,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import multiprocessing as mp
 import pandas as pd
 import time
+import threading
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from datetime import datetime
 from itertools import product
 from pathlib import Path
 from PIL import Image as PILImage
@@ -32,13 +34,14 @@ from jpeg import Jpeg, JpegCompressionSettings
 
 def process_image_combination(args):
     """Process a single image with multiple compression settings combinations."""
-    img_path, color_spaces, quality_ranges, block_size_ranges = args
+    img_path, color_spaces, quality_ranges, block_size_ranges, progress_queue = args
 
     # Load the image only once for all combinations
     try:
         img = Image.load(img_path)
     except Exception as e:
-        return [], f"Error loading image {img_path.name}: {str(e)}"
+        progress_queue.put(("error", f"Error loading image {img_path.name}: {str(e)}"))
+        return [], []
 
     # Create a JPEG compressor to reuse
     jpeg = Jpeg(JpegCompressionSettings())
@@ -48,6 +51,10 @@ def process_image_combination(args):
 
     # Calculate uncompressed size once
     uncompressed_size = len(PILImage.fromarray(img.get_uint8()).tobytes())
+
+    # Total combinations for this image
+    total_combinations = len(color_spaces) * len(quality_ranges) * len(block_size_ranges)
+    completed = 0
 
     # Process all combinations for this image
     for color_space, quality_range, block_size_range in product(
@@ -95,6 +102,16 @@ def process_image_combination(args):
             error_msg = f"Error processing {img_path.name} with {color_space}, Q:{quality_range}, B:{block_size_range}: {str(e)}"
             errors.append(error_msg)
 
+        # Update progress after each combination
+        completed += 1
+        progress_queue.put(("progress", {
+            "image": str(img_path),
+            "completed": completed,
+            "total": total_combinations
+        }))
+
+    # Signal that this image is completely done
+    progress_queue.put(("complete", str(img_path)))
     return results, errors
 
 
@@ -107,6 +124,7 @@ class AnalysisMetrics:
         quality_ranges,
         block_size_ranges,
         n_workers=None,
+        progress_update_interval=10
     ):
         self.img_files = img_files
         self.result_file = result_file
@@ -115,6 +133,7 @@ class AnalysisMetrics:
         self.block_size_ranges = block_size_ranges
         # Default to CPU count if n_workers not specified
         self.n_workers = n_workers if n_workers is not None else mp.cpu_count()
+        self.progress_update_interval = progress_update_interval
 
     def get_summary(self):
         total_combinations = len(self.img_files) * len(self.color_spaces) * len(self.quality_ranges) * len(self.block_size_ranges)
@@ -126,6 +145,80 @@ class AnalysisMetrics:
                   f"Using {self.n_workers} worker processes"
         return total_combinations, summary
 
+    def _progress_monitor(self, progress_queue, total_combinations, start_time):
+        """Monitor and display progress updates from all workers."""
+        completed_combinations = 0
+        image_progress = {}  # Track progress for each image
+        active_images = set()  # Currently processing images
+        completed_images = set()  # Fully completed images
+        last_update_time = start_time
+
+        while completed_images != set(str(img) for img in self.img_files):
+            # Get progress updates
+            try:
+                msg_type, data = progress_queue.get(timeout=1.0)
+
+                # Update image progress
+                if msg_type == "progress":
+                    img_name = data["image"]
+                    image_progress[img_name] = {
+                        "completed": data["completed"],
+                        "total": data["total"]
+                    }
+                    active_images.add(img_name)
+
+                    # Calculate overall progress
+                    completed_combinations = sum(img["completed"] for img in image_progress.values())
+
+                # Image is fully processed
+                elif msg_type == "complete":
+                    img_name = data
+                    completed_images.add(img_name)
+                    if img_name in active_images:
+                        active_images.remove(img_name)
+
+                # Print error messages immediately
+                elif msg_type == "error":
+                    print(data)
+
+            # No updates received
+            except mp.queues.Empty:
+                pass
+
+            # Update progress display at regular intervals
+            finally:
+                current_time = time.time()
+                if current_time - last_update_time >= self.progress_update_interval:
+                    self._print_progress(
+                        completed_combinations, 
+                        total_combinations, 
+                        start_time,
+                        len(completed_images),
+                        len(self.img_files),
+                        len(active_images)
+                    )
+                    last_update_time = current_time
+
+    def _print_progress(self, completed, total, start_time, completed_images, total_images, active_images):
+        """Print a formatted progress message."""
+        elapsed_time = time.time() - start_time
+        elapsed = f"{elapsed_time/60:.2f} min"
+
+        if completed == 0:
+            percent = 0
+            remaining = "..."
+        else:
+            percent = completed / total * 100
+            remaining_time = (elapsed_time / completed) * (total - completed)
+            remaining = f"{remaining_time/60:.2f} min"
+
+        print(
+            f"\r[{datetime.now().strftime('%H:%M:%S')}] "
+            f"Progress: {completed}/{total} ({percent:.2f}%) | "
+            f"Images: {completed_images}/{total_images} completed, {active_images} active | "
+            f"Elapsed: {elapsed} | Remaining: {remaining}"
+        )
+
     def run(self):
         # Get analysis summary
         total_combinations, summary = self.get_summary()
@@ -134,13 +227,29 @@ class AnalysisMetrics:
         # Initialize result collection
         all_results = []
 
+        # Create a queue for progress updates
+        manager = mp.Manager()
+        progress_queue = manager.Queue()
+
         # Track progress
         start_time = time.time()
-        processed_images = 0
+
+        # Start progress monitor in a separate thread
+        progress_thread = threading.Thread(
+            target=self._progress_monitor, 
+            args=(progress_queue, total_combinations, start_time)
+        )
+        progress_thread.daemon = True
+        progress_thread.start()
 
         # Prepare arguments for parallel processing - each process handles one image with all combinations
-        process_args = [(img_path, self.color_spaces, self.quality_ranges, self.block_size_ranges) 
-                         for img_path in self.img_files]
+        process_args = [(
+            img_path, 
+            self.color_spaces, 
+            self.quality_ranges, 
+            self.block_size_ranges,
+            progress_queue
+        ) for img_path in self.img_files]
 
         # Use ProcessPoolExecutor for parallel processing
         with ProcessPoolExecutor(max_workers=self.n_workers) as executor:
@@ -160,20 +269,19 @@ class AnalysisMetrics:
                     for error in errors:
                         print(error)
 
-                    # Update progress
-                    processed_images += 1
-                    combinations_per_image = len(self.color_spaces) * len(self.quality_ranges) * len(self.block_size_ranges)
-                    processed_combinations = processed_images * combinations_per_image
-
-                    elapsed = time.time() - start_time
-                    remaining = (elapsed / processed_combinations) * (total_combinations - processed_combinations)
-
-                    print(f"Progress: {processed_images}/{len(self.img_files)} images "
-                          f"({processed_combinations}/{total_combinations} combinations, {processed_combinations/total_combinations*100:.2f}%) - "
-                          f"Est. time remaining: {remaining/60:.2f} minutes")
-
                 except Exception as e:
                     print(f"Error processing {img_path.name}: {str(e)}")
+
+        # Wait for progress thread to finish
+        progress_thread.join(timeout=1.0)
+
+        # Final progress update
+        total_time = time.time() - start_time
+        print(
+            f"Processing complete: {total_combinations} combinations processed\n"
+            f"Total execution time: {total_time/60:.2f} minutes\n"
+            f"Average time per combination: {total_time/total_combinations:.4f} seconds"
+        )
 
         # Create DataFrame from results
         df = pd.DataFrame(all_results)
@@ -186,11 +294,6 @@ class AnalysisMetrics:
         # Save to CSV
         df.to_csv(self.result_file, index=False)
         print(f"Results saved to {self.result_file}")
-
-        # Print performance stats
-        total_time = time.time() - start_time
-        print(f"Total execution time: {total_time/60:.2f} minutes")
-        print(f"Average time per combination: {total_time/total_combinations:.4f} seconds")
 
 
 if __name__ == "__main__":
