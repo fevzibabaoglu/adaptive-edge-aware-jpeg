@@ -31,7 +31,7 @@ from .image import Image
 class EvaluationMetrics:
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=UserWarning)
-        loss_fn = lpips.LPIPS(net='alex')
+        loss_fn = lpips.LPIPS(net='alex', verbose=False)
 
     def __init__(self, original_image, compressed_image):
         self.original_image = original_image
