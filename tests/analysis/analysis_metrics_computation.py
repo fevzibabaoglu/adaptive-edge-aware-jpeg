@@ -115,7 +115,7 @@ def process_image_combination(args):
     return results, errors
 
 
-class AnalysisMetrics:
+class AnalysisMetricsComputation:
     def __init__(
         self, 
         img_files, 
@@ -328,7 +328,7 @@ if __name__ == "__main__":
                 block_size_ranges.append((min_size, max_size))
 
     # Run analysis
-    analysis = AnalysisMetrics(
+    analysis = AnalysisMetricsComputation(
         img_files=img_files,
         result_file=result_file,
         color_spaces=color_spaces,
