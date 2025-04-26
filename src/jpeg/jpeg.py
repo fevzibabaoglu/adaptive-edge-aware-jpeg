@@ -20,6 +20,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import cv2 as cv
 import json
 import math
+import numba as nb
 import numpy as np
 import zlib
 from collections import deque
@@ -182,13 +183,13 @@ class Jpeg:
         Args:
             settings (JpegCompressionSettings): Compression settings.
         """
-        self.settings = settings
-        self.update_layer_shapes()
+        self.update_settings(settings)
 
     def update_settings(self, settings: JpegCompressionSettings) -> None:
         """Update compression settings."""
         self.settings = settings
         self.update_layer_shapes()
+        self.precompute_caches()
 
     def update_layer_shapes(self, layer_shape: Optional[Tuple[int, int]] = None) -> None:
         """Update layer shapes based on the original shape and downsampling ratios."""
@@ -196,6 +197,28 @@ class Jpeg:
             self.layer_shape = layer_shape
         if hasattr(self, 'layer_shape'):
             self.layer_shapes = self._compute_downsampled_shapes(self.layer_shape)
+
+    def precompute_caches(self) -> None:
+        """Precompute caches for faster processing."""
+        block_size_range = self.settings.block_size_range
+        block_sizes = [n for n in range(block_size_range[0], block_size_range[1] + 1) if n > 0 and (n & (n-1)) == 0]
+
+        # Precompute zigzag ordering indices
+        self.zigzag_cache = {}
+        for size in block_sizes:
+            self.zigzag_cache[size] = Jpeg._zigzag_ordering(size, size)
+
+        # Precompute quantization matrices
+        self.quantization_matrix_cache = {}
+        for i, quantization_matrix in enumerate(self.settings.quantization_matrices):
+            self.quantization_matrix_cache[i] = {}
+
+            for size in block_sizes:
+                self.quantization_matrix_cache[i][size] = Jpeg._get_quantization_matrix(
+                    quantization_matrix,
+                    size,
+                    self._get_quality_factor(size),
+                )
 
     def compress(self, img: Image) -> bytes:
         """Compress the image.
@@ -382,11 +405,7 @@ class Jpeg:
         for i, blocks in enumerate(img_blocks):
             quantized_blocks = []
             for block in blocks:
-                qmatrix = Jpeg._get_quantization_matrix(
-                    self.settings.quantization_matrices[i],
-                    block.shape[0],
-                    self._get_quality_factor(block.shape[0]),
-                )
+                qmatrix = self.quantization_matrix_cache[i][block.shape[0]]
                 quantized_block = np.round(block / qmatrix).astype(np.int32)
                 quantized_blocks.append(quantized_block)
 
@@ -401,11 +420,7 @@ class Jpeg:
         for i, blocks in enumerate(img_blocks):
             dequantized_blocks = []
             for block in blocks:
-                qmatrix = Jpeg._get_quantization_matrix(
-                    self.settings.quantization_matrices[i],
-                    block.shape[0],
-                    self._get_quality_factor(block.shape[0]),
-                )
+                qmatrix = self.quantization_matrix_cache[i][block.shape[0]]
                 dequantized_block = (block * qmatrix).astype(np.float32)
                 dequantized_blocks.append(dequantized_block)
 
@@ -454,9 +469,9 @@ class Jpeg:
             # Apply zigzag ordering to each block
             zigzagged_blocks = []
             for block in blocks:
-                h, w = block.shape
-                zigzagged = np.zeros(h * w, dtype=np.int32)
-                indices = Jpeg._zigzag_ordering(h, w)
+                size = block.shape[0]
+                zigzagged = np.zeros(size * size, dtype=np.int32)
+                indices = self.zigzag_cache[size]
                 for i, (y, x) in enumerate(indices):
                     zigzagged[i] = block[y, x]
                 zigzagged_blocks.append(zigzagged)
@@ -529,7 +544,7 @@ class Jpeg:
             blocks = []
             for size, block_coeffs in zip(leaf_sizes, zigzagged_blocks):
                 block = np.zeros((size, size), dtype=np.int32)
-                indices = Jpeg._zigzag_ordering(size, size)
+                indices = self.zigzag_cache[size]
                 for i, (y, x) in enumerate(indices):
                     if i < len(block_coeffs):
                         block[y, x] = block_coeffs[i]
