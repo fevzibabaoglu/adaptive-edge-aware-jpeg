@@ -469,10 +469,8 @@ class Jpeg:
             zigzagged_blocks = []
             for block in blocks:
                 size = block.shape[0]
-                zigzagged = np.zeros(size * size, dtype=np.int32)
                 indices = self.zigzag_cache[size]
-                for i, (y, x) in enumerate(indices):
-                    zigzagged[i] = block[y, x]
+                zigzagged = block.ravel()[indices]
                 zigzagged_blocks.append(zigzagged)
 
             # Compress zigzagged blocks
@@ -542,13 +540,12 @@ class Jpeg:
             # Apply inverse zigzag ordering
             blocks = []
             for size, block_coeffs in zip(leaf_sizes, zigzagged_blocks):
-                block = np.zeros((size, size), dtype=np.int32)
                 indices = self.zigzag_cache[size]
-                for i, (y, x) in enumerate(indices):
-                    if i < len(block_coeffs):
-                        block[y, x] = block_coeffs[i]
+                block = np.zeros(size * size, dtype=np.int32)
+                block[indices] = block_coeffs[:len(indices)]
+                block = block.reshape((size, size))
                 blocks.append(block)
-            
+
             img_blocks.append(blocks)
 
         return img_blocks
@@ -576,7 +573,7 @@ class Jpeg:
         resized_matrix = cv.resize(scaled_matrix, (size, size), interpolation=cv.INTER_LINEAR)
         resized_matrix = np.clip(resized_matrix, 1, None)
         return resized_matrix.astype(np.int32)
-    
+
     @staticmethod
     def _zigzag_ordering(size):
         """Generate zigzag ordering indices for an nxn block."""
@@ -587,7 +584,7 @@ class Jpeg:
         row, col = 0, 0
 
         for _ in range(size * size):
-            result.append((row, col))
+            result.append(row * size + col)
 
             # Moving up and right
             if (row + col) % 2 == 0:
@@ -609,7 +606,7 @@ class Jpeg:
                     row += 1
                     col -= 1
 
-        return result
+        return np.array(result, dtype=np.int32)
 
     @staticmethod
     def _decode_leaf_sizes(states, root_size):
