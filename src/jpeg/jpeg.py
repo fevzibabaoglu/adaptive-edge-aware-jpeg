@@ -365,30 +365,28 @@ class Jpeg:
             H, W = self.layer_shapes[i]
             node_size = largest_power_of_2(max(H, W)) * 2
             image_layer = np.zeros((node_size, node_size), dtype=np.float32)
+
+            stack = [(0, 0, node_size)]
             leaves_deque = deque(blocks)
 
-            # Recursive function to rebuild the layer from blocks
-            def rebuild_layer(x: int, y: int, node_size: int) -> None:
-                if not leaves_deque or x >= W or y >= H or node_size == 0:
-                    return
+            while stack and leaves_deque:
+                x, y, node_size = stack.pop()
+
+                if x >= W or y >= H or node_size == 0:
+                    continue
 
                 current_leaf = leaves_deque[0]
                 leaf_size = current_leaf.shape[0]
 
-                # Check if the current region matches the leaf size
-                # If not, split into quadrants
                 if node_size == leaf_size:
                     image_layer[y:y+node_size, x:x+node_size] = current_leaf
                     leaves_deque.popleft()
                 else:
-                    child_node_size = node_size // 2
-                    rebuild_layer(x, y, child_node_size)                                      # Top-left
-                    rebuild_layer(x + child_node_size, y, child_node_size)                    # Top-right
-                    rebuild_layer(x, y + child_node_size, child_node_size)                    # Bottom-left
-                    rebuild_layer(x + child_node_size, y + child_node_size, child_node_size)  # Bottom-right
-
-            # Rebuild the layer
-            rebuild_layer(0, 0, node_size)
+                    child_size = node_size // 2
+                    stack.append((x + child_size, y + child_size, child_size))
+                    stack.append((x, y + child_size, child_size))
+                    stack.append((x + child_size, y, child_size))
+                    stack.append((x, y, child_size))
 
             # Crop to target size and denormalize
             image_layer = image_layer[:H, :W]
@@ -635,26 +633,21 @@ class Jpeg:
         # Create leaf sizes by traversing the tree in the same order as encoding
         leaf_sizes = []
         state_idx = 0
+        stack = [root_size]
 
-        def process_node(size):
-            nonlocal state_idx
-            if state_idx >= len(states):
-                return
+        while stack and state_idx < len(states):
+            size = stack.pop()
 
             state = states[state_idx]
             state_idx += 1
 
-            # Leaf node
-            if state == 0:
+            if state == 0:  # Leaf node
                 leaf_sizes.append(size)
-            # No node
-            elif state == 2:
+            elif state == 2:  # No node
                 pass
-            # Internal node (split)
-            else:
+            else:  # Internal node (split)
                 half_size = size // 2
-                for _ in range(4):
-                    process_node(half_size)
+                for _ in reversed(range(4)):
+                    stack.append(half_size)
 
-        process_node(root_size)
         return leaf_sizes
