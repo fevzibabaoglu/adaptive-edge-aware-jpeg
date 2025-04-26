@@ -20,7 +20,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import cv2 as cv
 import json
 import math
-import numba as nb
 import numpy as np
 import zlib
 from collections import deque
@@ -201,12 +200,12 @@ class Jpeg:
     def precompute_caches(self) -> None:
         """Precompute caches for faster processing."""
         block_size_range = self.settings.block_size_range
-        block_sizes = [n for n in range(block_size_range[0], block_size_range[1] + 1) if n > 0 and (n & (n-1)) == 0]
+        block_sizes = [2**i for i in range(int(math.log2(block_size_range[0])), int(math.log2(block_size_range[1])) + 1)]
 
         # Precompute zigzag ordering indices
         self.zigzag_cache = {}
         for size in block_sizes:
-            self.zigzag_cache[size] = Jpeg._zigzag_ordering(size, size)
+            self.zigzag_cache[size] = Jpeg._zigzag_ordering(size)
 
         # Precompute quantization matrices
         self.quantization_matrix_cache = {}
@@ -579,20 +578,20 @@ class Jpeg:
         return resized_matrix.astype(np.int32)
     
     @staticmethod
-    def _zigzag_ordering(h, w):
+    def _zigzag_ordering(size):
         """Generate zigzag ordering indices for an nxn block."""
-        if not isinstance(h, int) or not isinstance(w, int) or h < 0 or w < 0:
+        if not isinstance(size, int) or size < 0:
             raise ValueError("Block size must be an non-negative integer")
 
         result = []
         row, col = 0, 0
 
-        for _ in range(h * w):
+        for _ in range(size * size):
             result.append((row, col))
 
             # Moving up and right
             if (row + col) % 2 == 0:
-                if col == w - 1: # Reached right edge, go down
+                if col == size - 1: # Reached right edge, go down
                     row += 1
                 elif row == 0: # Reached top edge, go right
                     col += 1
@@ -602,7 +601,7 @@ class Jpeg:
 
             # Moving down and left
             else:
-                if row == h - 1: # Reached bottom edge, go right
+                if row == size - 1: # Reached bottom edge, go right
                     col += 1
                 elif col == 0: # Reached left edge, go down
                     row += 1
