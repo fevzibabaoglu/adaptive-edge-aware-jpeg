@@ -203,21 +203,33 @@ class Jpeg:
         block_sizes = [2**i for i in range(int(math.log2(block_size_range[0])), int(math.log2(block_size_range[1])) + 1)]
 
         # Precompute zigzag ordering indices
-        self.zigzag_cache = {}
+        if not hasattr(self, 'zigzag_cache'):
+            self.zigzag_cache = {}
         for size in block_sizes:
-            self.zigzag_cache[size] = Jpeg._zigzag_ordering(size)
+            if size not in self.zigzag_cache:
+                self.zigzag_cache[size] = Jpeg._zigzag_ordering(size)
 
         # Precompute quantization matrices
-        self.quantization_matrix_cache = {}
+        if not hasattr(self, 'quantization_matrix_cache'):
+            self.quantization_matrix_cache = {}
         for i, quantization_matrix in enumerate(self.settings.quantization_matrices):
-            self.quantization_matrix_cache[i] = {}
+            if i not in self.quantization_matrix_cache:
+                self.quantization_matrix_cache[i] = {}
 
             for size in block_sizes:
-                self.quantization_matrix_cache[i][size] = Jpeg._get_quantization_matrix(
-                    quantization_matrix,
+                # Create a composite key for size, quality range, and color space
+                cache_key = (
+                    self.settings.color_space,
+                    self.settings.quality_range,
                     size,
-                    self._get_quality_factor(size),
                 )
+
+                if cache_key not in self.quantization_matrix_cache[i]:
+                    self.quantization_matrix_cache[i][cache_key] = Jpeg._get_quantization_matrix(
+                        quantization_matrix,
+                        size,
+                        self._get_quality_factor(size),
+                    )
 
     def compress(self, img: Image) -> bytes:
         """Compress the image.
@@ -404,7 +416,11 @@ class Jpeg:
         for i, blocks in enumerate(img_blocks):
             quantized_blocks = []
             for block in blocks:
-                qmatrix = self.quantization_matrix_cache[i][block.shape[0]]
+                qmatrix = self.quantization_matrix_cache[i][(
+                    self.settings.color_space,
+                    self.settings.quality_range,
+                    block.shape[0],
+                )]
                 quantized_block = np.round(block / qmatrix).astype(np.int32)
                 quantized_blocks.append(quantized_block)
 
@@ -419,7 +435,11 @@ class Jpeg:
         for i, blocks in enumerate(img_blocks):
             dequantized_blocks = []
             for block in blocks:
-                qmatrix = self.quantization_matrix_cache[i][block.shape[0]]
+                qmatrix = self.quantization_matrix_cache[i][(
+                    self.settings.color_space,
+                    self.settings.quality_range,
+                    block.shape[0],
+                )]
                 dequantized_block = (block * qmatrix).astype(np.float32)
                 dequantized_blocks.append(dequantized_block)
 
@@ -506,6 +526,7 @@ class Jpeg:
 
         # Update layer shapes based on the original image shape
         self.update_layer_shapes(layer_shape)
+        self.precompute_caches()
 
         for _ in range(num_layers):
             # Read header length and root size
