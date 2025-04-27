@@ -19,52 +19,67 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import os
 import pandas as pd
-import re
 from pathlib import Path
 
 
 class AnalysisMetrics:
+    # Standard JPEG results for comparison
+    STANDARD_JPEG_RESULTS = [
+        {'quality': 10, 'psnr': 25.6922, 'ssim': 0.8877, 'ms_ssim': 0.9014, 'lpips': 0.2956, 'compression_ratio': 33.4996},
+        {'quality': 25, 'psnr': 28.7196, 'ssim': 0.9572, 'ms_ssim': 0.9569, 'lpips': 0.1496, 'compression_ratio': 19.0805},
+        {'quality': 50, 'psnr': 30.8579, 'ssim': 0.9797, 'ms_ssim': 0.9759, 'lpips': 0.0832, 'compression_ratio': 12.9556},
+        {'quality': 75, 'psnr': 33.1062, 'ssim': 0.9901, 'ms_ssim': 0.9855, 'lpips': 0.0435, 'compression_ratio': 9.0690},
+        {'quality': 90, 'psnr': 36.3888, 'ssim': 0.9964, 'ms_ssim': 0.9925, 'lpips': 0.0148, 'compression_ratio': 5.7528},
+    ]
+
+    # Define column groups
+    GROUPING_COLUMNS = [
+        'color_space', 
+        'min_quality', 
+        'max_quality', 
+        'min_block_size', 
+        'max_block_size'
+    ]
+    NUMERIC_COLUMNS = [
+        'psnr', 
+        'ssim', 
+        'ms_ssim', 
+        'lpips', 
+        'compression_ratio'
+    ]
+
+
     def __init__(
         self,
         input_file=None,
-        grouping_columns=None,
-        numeric_columns=None,
         quality_threshold=0.05,     # 5% tolerance for quality metrics
         compression_threshold=0.05, # 5% tolerance for compression ratio
     ):
         self.input_file = input_file
-        self.grouping_columns = grouping_columns
-        self.numeric_columns = numeric_columns
         self.quality_threshold = quality_threshold
         self.compression_threshold = compression_threshold
 
+        self.filename = os.path.splitext(os.path.basename(self.input_file))[0]
         self.input_dir = os.path.dirname(self.input_file)
-
-        # Extract timestamp from the original file name
-        filename = os.path.basename(self.input_file)
-        timestamp_match = re.search(r'(\d{8}-\d{6})', filename)
-        self.timestamp = timestamp_match.group(1) if timestamp_match else "unknown-time"
 
         # Store the dataframes
         self.df = None
         self.avg_df = None
-        self.standard_df = None
 
     def load_data(self):
         """Load the data from CSV and convert numeric columns."""
-        # Read the input CSV file
         self.df = pd.read_csv(self.input_file)
 
     def calculate_averages(self):
         """Calculate averages by grouping settings."""
         # Create the output file
-        output_file = Path(f'{self.input_dir}/avg_compression_results_{self.timestamp}.csv')
+        output_file = Path(f'{self.input_dir}/{self.filename}_avg.csv')
 
         # Group and calculate averages
-        self.avg_df = self.df.groupby(self.grouping_columns)[self.numeric_columns].mean().reset_index()
+        self.avg_df = self.df.groupby(AnalysisMetrics.GROUPING_COLUMNS)[AnalysisMetrics.NUMERIC_COLUMNS].mean().reset_index()
 
         # Round the averages to 4 decimal places for readability
-        for col in self.numeric_columns:
+        for col in AnalysisMetrics.NUMERIC_COLUMNS:
             self.avg_df[col] = self.avg_df[col].round(4)
 
         # Save to CSV
@@ -73,119 +88,98 @@ class AnalysisMetrics:
 
     def find_standard_jpeg_settings(self):
         """Find settings that match standard JPEG configuration (YCbCr, 8x8 blocks, fixed quality)."""
-        # Filter for YCbCr color space, 8x8 block size, and equal min/max quality
-        self.standard_df = self.avg_df[
+        standard_df = self.avg_df[
             (self.avg_df['color_space'] == 'YCbCr') & 
             (self.avg_df['min_block_size'] == 8) & 
             (self.avg_df['max_block_size'] == 8) &
             (self.avg_df['min_quality'] == self.avg_df['max_quality'])
         ]
-        self.standard_df = self.standard_df.sort_values(by='min_quality')
+        return standard_df.sort_values(by='min_quality')
 
     def find_better_configurations(self):
         """Find configurations that outperform standard JPEG settings."""
-        quality_metrics = [m for m in self.numeric_columns if m != 'compression_ratio']
+        quality_metrics = [m for m in AnalysisMetrics.NUMERIC_COLUMNS if m != 'compression_ratio']
         better_compression_settings = []
         better_quality_settings = []
 
-        for _, std_row in self.standard_df.iterrows():
-            std_quality = std_row['min_quality']
-            std_compression = std_row['compression_ratio']
-
+        for std in AnalysisMetrics.STANDARD_JPEG_RESULTS:
             for _, alt_row in self.avg_df.iterrows():
-                if self._is_same_configuration(std_row, alt_row):
-                    continue
+                # Compute compression and quality comparisons
+                compression_comparison = self._compression_comparison(std, alt_row)
+                metric_comparison = self._metric_comparison(std, alt_row, quality_metrics)
 
-                alt_compression = alt_row['compression_ratio']
+                # Check if the alternative is better in terms of compression and quality
+                is_similar_compression = compression_comparison['is_similar']
+                is_better_compression = compression_comparison['is_better']
+                is_similar_quality = all(item['is_similar'] for item in metric_comparison)
+                is_better_quality = any(item['is_better'] for item in metric_comparison)
 
                 # Create a comparison data structure
-                comparison = self._create_comparison_data(alt_row, std_row, std_quality, quality_metrics)
+                comparison = pd.Series({
+                    'color_space': alt_row['color_space'],
+                    'min_quality': alt_row['min_quality'],
+                    'max_quality': alt_row['max_quality'],
+                    'min_block_size': alt_row['min_block_size'],
+                    'max_block_size': alt_row['max_block_size'],
+                    'quality_compared_to': std['quality'],
+                })
 
-                # Check for better compression (similar quality, better compression)
-                if self._has_similar_quality(std_row, alt_row, quality_metrics):
-                    if alt_compression > std_compression * (1 + self.compression_threshold):
-                        better_compression_settings.append(comparison)
+                # Add the metrics to the comparison
+                for metric in metric_comparison:
+                    comparison[f'{metric['metric']}_ratio'] = round(metric['ratio'], 4)
+                comparison['compression_ratio'] = round(compression_comparison['ratio'], 4)
 
-                # Check for better quality (similar compression, better quality)
-                compression_diff_pct = abs((alt_compression - std_compression) / std_compression)
-                if compression_diff_pct <= self.compression_threshold:
-                    if self._has_better_quality(std_row, alt_row, quality_metrics):
-                        better_quality_settings.append(comparison)
+                # Better compression (similar quality, better compression)
+                if is_better_compression and (is_similar_quality or is_better_quality):
+                    better_compression_settings.append(comparison)
+                # Better quality (similar compression, better quality)
+                if (is_similar_compression or is_better_compression) and is_better_quality:
+                    better_quality_settings.append(comparison)
 
         self._save_results(better_compression_settings, better_quality_settings)
 
-    def _is_same_configuration(self, std_row, alt_row):
-        """Check if two configurations are the same."""
-        return (alt_row['color_space'] == std_row['color_space'] and 
-                alt_row['min_quality'] == std_row['min_quality'] and
-                alt_row['max_quality'] == std_row['max_quality'] and
-                alt_row['min_block_size'] == std_row['min_block_size'] and
-                alt_row['max_block_size'] == std_row['max_block_size'])
+    def _compression_comparison(self, std, alt_row):
+        """Compare the standard and alternative in terms of compression."""
+        ratio = alt_row['compression_ratio'] / std['compression_ratio']
+        return {
+            'ratio': ratio,
+            'is_similar': abs(ratio - 1) <= self.compression_threshold,
+            'is_better': ratio - 1 > self.compression_threshold
+        }
 
-    def _create_comparison_data(self, alt_row, std_row, std_quality, quality_metrics):
-        """Create a comparison data structure with metric differences."""
-        comparison = alt_row.copy()
-        comparison['compared_to_quality'] = std_quality
-
-        # Calculate compression ratio difference
-        comparison['compression_diff'] = round(
-            alt_row['compression_ratio'] / std_row['compression_ratio'], 2
-        )
-
-        # Calculate quality metric differences
+    def _metric_comparison(self, std, alt_row, quality_metrics):
+        """Compare the standard and alternative in terms of quality metrics."""
+        results = []
+        
         for metric in quality_metrics:
-            ratio, _ = self._calc_metric_ratio(std_row[metric], alt_row[metric], metric)
-            comparison[f'{metric}_diff'] = round(ratio, 2)
+            ratio = alt_row[metric] / std[metric]
+            is_higher_better = metric not in ['lpips']
 
-        return comparison
+            is_similar = abs(ratio - 1) <= self.quality_threshold
+            is_better = (ratio - 1) * (int(is_higher_better) * 2 - 1) > self.quality_threshold
 
-    def _calc_metric_ratio(self, std_value, alt_value, metric):
-        """Calculate ratio of alternative to standard for a quality metric."""
-        return alt_value / std_value, metric != 'lpips'
+            results.append({
+                'metric': metric,
+                'ratio': ratio,
+                'is_similar': is_similar,
+                'is_better': is_better
+            })
 
-    def _has_similar_quality(self, std_row, alt_row, quality_metrics):
-        """Check if alternative configuration has similar quality metrics to standard."""
-        for metric in quality_metrics:
-            ratio, higher_is_better = self._calc_metric_ratio(std_row[metric], alt_row[metric], metric)
-
-            # For metrics where higher is better
-            if higher_is_better:
-                if ratio < (1 - self.quality_threshold):
-                    return False
-            # For metrics where lower is better
-            else:
-                if ratio > (1 + self.quality_threshold):
-                    return False
-        return True
-
-    def _has_better_quality(self, std_row, alt_row, quality_metrics):
-        """Check if alternative configuration has better quality metrics than standard."""
-        for metric in quality_metrics:
-            ratio, higher_is_better = self._calc_metric_ratio(std_row[metric], alt_row[metric], metric)
-
-            # For metrics where higher is better
-            if higher_is_better:
-                if ratio > (1 + self.quality_threshold):
-                    return True
-            # For metrics where lower is better
-            else:
-                if ratio < (1 - self.quality_threshold):
-                    return True
-        return False
+        return results
 
     def _save_results(self, better_compression_settings, better_quality_settings):
         """Save both compression and quality results to CSV files."""
         # Save better compression results
         if better_compression_settings:
             self.better_compression_df = pd.DataFrame(better_compression_settings)
-            compression_file = Path(f'{self.input_dir}/better_compression_{self.timestamp}.csv')
+            compression_file = Path(f'{self.input_dir}/{self.filename}_better_compression.csv')
             self.better_compression_df.to_csv(compression_file, index=False)
             print(f"Better compression configurations saved to: {compression_file} [{len(self.better_compression_df)} configurations]")
 
         # Save better quality results
         if better_quality_settings:
             self.better_quality_df = pd.DataFrame(better_quality_settings)
-            quality_file = Path(f'{self.input_dir}/better_quality_{self.timestamp}.csv')
+            quality_file = Path(f'{self.input_dir}/{self.filename}_better_quality.csv')
             self.better_quality_df.to_csv(quality_file, index=False)
             print(f"Better quality configurations saved to: {quality_file} [{len(self.better_quality_df)} configurations]")
 
@@ -193,36 +187,20 @@ class AnalysisMetrics:
         """Main method to execute the analysis pipeline."""
         self.load_data()
         self.calculate_averages()
-        self.find_standard_jpeg_settings()
         self.find_better_configurations()
 
 
 if __name__ == "__main__":
-    # Define column groups
-    grouping_columns = [
-        'color_space', 
-        'min_quality', 
-        'max_quality', 
-        'min_block_size', 
-        'max_block_size'
-    ]
-    numeric_columns = [
-        'psnr', 
-        'ssim', 
-        'ms_ssim', 
-        'lpips', 
-        'compression_ratio'
-    ]
-
     # Set input file path
-    input_file = "test_results/compression_results_20250421-102733.csv"
+    input_file = "test_results/cr_test.csv"
 
     # Create and run the analysis
     analysis = AnalysisMetrics(
         input_file=input_file,
-        grouping_columns=grouping_columns,
-        numeric_columns=numeric_columns,
         quality_threshold=0.05,
         compression_threshold=0.05,
     )
     analysis.run()
+
+    # standard_avg = analysis.find_standard_jpeg_settings()
+    # print(standard_avg)

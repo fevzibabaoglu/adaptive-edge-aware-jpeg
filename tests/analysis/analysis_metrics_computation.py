@@ -141,8 +141,7 @@ class AnalysisMetricsComputation:
                   f"Color space count: {len(self.color_spaces)}\n" \
                   f"Quality range count: {len(self.quality_ranges)}\n" \
                   f"Block size range count: {len(self.block_size_ranges)}\n" \
-                  f"Total combinations: {total_combinations}\n" \
-                  f"Using {self.n_workers} worker processes"
+                  f"Total combinations: {total_combinations}"
         return total_combinations, summary
 
     def _progress_monitor(self, progress_queue, total_combinations, start_time):
@@ -304,7 +303,7 @@ if __name__ == "__main__":
 
     # Set result file path
     timestamp = time.strftime("%Y%m%d-%H%M%S")
-    result_file = Path(f'test_results/compression_results_{timestamp}.csv')
+    result_file = Path(f'test_results/cr_{timestamp}.csv')
 
     # Define color spaces
     color_spaces = get_color_spaces()
