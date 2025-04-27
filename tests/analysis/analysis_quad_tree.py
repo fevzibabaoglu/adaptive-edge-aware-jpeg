@@ -29,26 +29,31 @@ from jpeg.edge_detection import EdgeDetection
 
 
 class AnalysisQuadTree:
-    def __init__(self, img_dir, test_dir, color_space="YCoCg"):
+    def __init__(self, img_dir, test_dir):
         self.img_dir = Path(img_dir)
         self.test_dir = Path(test_dir)
-        self.color_space = color_space
 
-    def run(self, img_name, min_block_size=4, max_block_size=64):
+    def run(self, img_name, color_space, min_block_size=4, max_block_size=64):
         img_path = self.img_dir / img_name
+        filename = img_path.stem
 
         # Load test image
         img = Image.load(img_path)
-        converted_data = convert("sRGB", self.color_space, img.get_flattened())
+        converted_data = convert("sRGB", color_space, img.get_flattened())
         img_converted = Image.from_array(converted_data, img.original_shape)
 
         # Get luminance channel
         luminance_data = img_converted.data[:, :, 0]
-        img_luminance = Image.from_array(luminance_data)
 
         # Save luminance channel
-        luminance_path = self.test_dir / f"{img_name}_luminance.png"
-        img_luminance.save(luminance_path)
+        img_luminance = Image.from_array(luminance_data)
+        img_luminance.save(self.test_dir / f"{filename}_luminance.png")
+
+        # Save chrominance channels
+        img_chrominance_1 = Image.from_array(img_converted.data[:, :, 1])
+        img_chrominance_2 = Image.from_array(img_converted.data[:, :, 2])
+        img_chrominance_1.save(self.test_dir / f"{filename}_chrominance_1.png")
+        img_chrominance_2.save(self.test_dir / f"{filename}_chrominance_2.png")
 
         # Edge detection
         start_time = time.perf_counter()
@@ -58,7 +63,7 @@ class AnalysisQuadTree:
         img_edge = Image.from_array(edge_data)
 
         # Save edge image
-        edge_path = self.test_dir / f"{img_name}_edge.png"
+        edge_path = self.test_dir / f"{filename}_edge.png"
         img_edge.save(edge_path)
 
         # QuadTree creation
@@ -81,7 +86,7 @@ class AnalysisQuadTree:
             cv.rectangle(img_vis, (x, y), (x + s, y + s), (0, 255, 0), 1)
 
         # Save quadtree visualization
-        quadtree_path = self.test_dir / f"{img_name}_quadtree.png"
+        quadtree_path = self.test_dir / f"{filename}_quadtree.png"
         cv.imwrite(quadtree_path, img_vis)
 
 
@@ -91,7 +96,8 @@ if __name__ == "__main__":
         test_dir="test_results",
     )
     analysis.run(
-        img_name='hd.png',
+        img_name='lena.png',
+        color_space='YCoCg',
         min_block_size=8,
         max_block_size=128,
     )

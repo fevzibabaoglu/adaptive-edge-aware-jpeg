@@ -64,16 +64,16 @@ class TestCompressionSpeed(unittest.TestCase):
             # Run multiple iterations
             for i in range(num_iterations):
                 # Measure compression time
-                start_time = time.time()
+                start_time = time.perf_counter()
                 compressed = jpeg.compress(img)
-                compression_time_ms = (time.time() - start_time) * 1000
+                compression_time_ms = (time.perf_counter() - start_time) * 1000
                 total_compression_time_ms += compression_time_ms
 
                 # Measure decompression time
                 decompress_jpeg = Jpeg(JpegCompressionSettings())
-                start_time = time.time()
+                start_time = time.perf_counter()
                 _ = decompress_jpeg.decompress(compressed)
-                decompression_time_ms = (time.time() - start_time) * 1000
+                decompression_time_ms = (time.perf_counter() - start_time) * 1000
                 total_decompression_time_ms += decompression_time_ms
 
                 print(f"  Iteration {i+1} with block size {block_size}: "
