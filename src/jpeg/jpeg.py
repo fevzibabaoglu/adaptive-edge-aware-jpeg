@@ -210,15 +210,11 @@ class Jpeg:
                 self.zigzag_cache[size] = Jpeg._zigzag_ordering(size)
 
         # Precompute quantization matrices
-        if not hasattr(self, 'quantization_matrix_cache'):
-            self.quantization_matrix_cache = {}
         self.quantization_matrix_cache = {}
         for i, quantization_matrix in enumerate(self.settings.quantization_matrices):
             self.quantization_matrix_cache[i] = {}
 
             for size in block_sizes:
-                # Create a composite key for size, quality range, and color space
-                cache_key = (
                 self.quantization_matrix_cache[i][size] = Jpeg._get_quantization_matrix(
                     quantization_matrix,
                     size,
