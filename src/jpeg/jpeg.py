@@ -184,18 +184,21 @@ class Jpeg:
         """
         self.update_settings(settings)
 
-    def update_settings(self, settings: JpegCompressionSettings) -> None:
+    def update_settings(
+            self,
+            settings: JpegCompressionSettings,
+            layer_shape: Optional[Tuple[int, int]] = None
+        ) -> None:
         """Update compression settings."""
         self.settings = settings
-        self.update_layer_shapes()
+        if layer_shape is not None:
+            self.update_layer_shapes(layer_shape)
         self.precompute_caches()
 
-    def update_layer_shapes(self, layer_shape: Optional[Tuple[int, int]] = None) -> None:
+    def update_layer_shapes(self, layer_shape: Tuple[int, int]) -> None:
         """Update layer shapes based on the original shape and downsampling ratios."""
-        if layer_shape is not None:
-            self.layer_shape = layer_shape
-        if hasattr(self, 'layer_shape'):
-            self.layer_shapes = self._compute_downsampled_shapes(self.layer_shape)
+        self.layer_shape = layer_shape
+        self.layer_shapes = self._compute_downsampled_shapes(self.layer_shape)
 
     def precompute_caches(self) -> None:
         """Precompute caches for faster processing."""
@@ -499,14 +502,17 @@ class Jpeg:
         # Set metadata
         layer_shape = metadata['height'], metadata['width']
         num_layers = metadata['num_layers']
-        self.settings.color_space = metadata['color_space']
-        self.settings.quality_range = metadata['quality_min'], metadata['quality_max']
-        self.settings.block_size_range = metadata['block_size_min'], metadata['block_size_max']
         self.extension = metadata['extension']
 
-        # Update layer shapes based on the original image shape
-        self.update_layer_shapes(layer_shape)
-        self.precompute_caches()
+        # Update settings based on the original image
+        self.update_settings(
+            JpegCompressionSettings(
+                color_space=metadata['color_space'],
+                quality_range=(metadata['quality_min'], metadata['quality_max']),
+                block_size_range=(metadata['block_size_min'], metadata['block_size_max']),
+            ), 
+            layer_shape,
+        )
 
         for _ in range(num_layers):
             # Read header length and root size
