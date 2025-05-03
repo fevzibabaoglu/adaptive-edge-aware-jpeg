@@ -24,7 +24,7 @@ from .icacb import ICaCb
 from .ictcp import ICtCp
 from .jzazbz import JzAzBz
 from .oklab import OKLAB
-from .sycc import SYCC
+from .ycbcr import YCbCr
 from .xyz import XYZ
 from .ycocg import YCoCg
 
@@ -57,10 +57,10 @@ COLOR_CLASSES = {
         OKLAB.SCALE_FACTORS,
     ),
     'YCbCr': (
-        SYCC.srgb_to_sycc, 
-        SYCC.sycc_to_srgb,
-        SYCC.MIDPOINTS,
-        SYCC.SCALE_FACTORS,
+        YCbCr.srgb_to_ycbcr, 
+        YCbCr.ycbcr_to_srgb,
+        YCbCr.MIDPOINTS,
+        YCbCr.SCALE_FACTORS,
     ),
     'XYZ': (
         XYZ.srgb_to_xyz, 

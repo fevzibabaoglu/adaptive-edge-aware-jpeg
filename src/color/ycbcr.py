@@ -20,25 +20,22 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
 
 
-class SYCC:
-    """
-    Also known as YCbCr.
-    """
+class YCbCr:
     # Transformation matrix from sRGB to sYCC
-    M_SRGB_TO_SYCC = np.array([
+    M_SRGB_TO_YCBCR = np.array([
         [0.299000, 0.587000, 0.114000],
         [-0.168736, -0.331264, 0.500000],
         [0.500000, -0.418688, -0.081312]
     ], dtype=np.float32)
-    M_SRGB_TO_SYCC_T = M_SRGB_TO_SYCC.T
+    M_SRGB_TO_YCBCR_T = M_SRGB_TO_YCBCR.T
 
     # Transformation matrix from sYCC to sRGB
-    M_SYCC_TO_SRGB = np.array([
+    M_YCBCR_TO_SRGB = np.array([
         [1.000000, 0.000037, 1.401988],
         [1.000000, -0.344113, -0.714104],
         [1.000000, 1.771978, 0.000135]
     ], dtype=np.float32)
-    M_SYCC_TO_SRGB_T = M_SYCC_TO_SRGB.T
+    M_YCBCR_TO_SRGB_T = M_YCBCR_TO_SRGB.T
 
     # Normalization values (target range: [-127, 127])
     MIDPOINTS = np.array([0.5000000037252903, 7.450580596923828e-09, 0.0], dtype=np.float32)
@@ -46,40 +43,40 @@ class SYCC:
 
 
     @staticmethod
-    def srgb_to_sycc(srgb: np.ndarray) -> np.ndarray:
+    def srgb_to_ycbcr(srgb: np.ndarray) -> np.ndarray:
         """
-        Convert sRGB values to sYCC.
+        Convert sRGB values to YCbCr.
         
         Args:
             srgb (np.ndarray): sRGB array (shape: Nx3, values: [0, 1]).
         
         Returns:
-            np.ndarray: sYCC array (shape: Nx3).
+            np.ndarray: YCbCr array (shape: Nx3).
         """
         if not isinstance(srgb, np.ndarray):
             raise TypeError("Input must be a numpy array.")
         if srgb.ndim != 2 or srgb.shape[1] != 3:
             raise ValueError("Input array must be a 2D with 3 channels (r, g, b).")
         
-        return np.dot(srgb, SYCC.M_SRGB_TO_SYCC_T)
+        return np.dot(srgb, YCbCr.M_SRGB_TO_YCBCR_T)
     
     @staticmethod
-    def sycc_to_srgb(sycc: np.ndarray) -> np.ndarray:
+    def ycbcr_to_srgb(ycbcr: np.ndarray) -> np.ndarray:
         """
-        Convert sYCC values to sRGB.
+        Convert YCbCr values to sRGB.
         
         Args:
-            ycbcr (np.ndarray): sYCC array (shape: Nx3).
+            ycbcr (np.ndarray): YCbCr array (shape: Nx3).
         
         Returns:
             np.ndarray: sRGB array (values: [0, 1]).
         """
-        if not isinstance(sycc, np.ndarray):
+        if not isinstance(ycbcr, np.ndarray):
             raise TypeError("Input must be a numpy array.")
-        if sycc.ndim != 2 or sycc.shape[1] != 3:
+        if ycbcr.ndim != 2 or ycbcr.shape[1] != 3:
             raise ValueError("Input array must be a 2D with 3 channels (y, cb, cr).")
         
-        srgb = np.dot(sycc, SYCC.M_SYCC_TO_SRGB_T)
+        srgb = np.dot(ycbcr, YCbCr.M_YCBCR_TO_SRGB_T)
 
         # Clip values to ensure valid sRGB output (range: 0 to 1)
         return np.clip(srgb, 0.0, 1.0)
