@@ -24,6 +24,7 @@ from tkinter import ttk, messagebox
 
 from .control_panel import ControlPanel
 from .preview_panel import PreviewPanel
+from color import get_color_spaces
 from image import Image
 from jpeg import Jpeg, JpegCompressionSettings
 
@@ -34,11 +35,6 @@ class JpegApp:
     def __init__(
         self,
         root,
-        # Available color space options
-        color_spaces=[
-            "YCbCr", "YCoCg", "YCoCg-R", "ICaCb",
-            "ICtCp", "JzAzBz", "OKLAB"
-        ],
         default_color_space="YCoCg",
         # Quality settings range
         quality_range=(1, 99),
@@ -59,7 +55,6 @@ class JpegApp:
 
         Args:
             root: Tkinter root window
-            color_spaces: List of available color spaces
             default_color_space: Default selected color space
             quality_range: Min and max possible quality values (tuple)
             default_quality_range: Default selected quality range (tuple)
@@ -90,7 +85,7 @@ class JpegApp:
             on_change_callback=self.update_settings,
             on_compress_callback=self.compress_images,
             on_decompress_callback=self.decompress_images,
-            color_spaces=color_spaces,
+            color_spaces=get_color_spaces(),
             default_color_space=default_color_space,
             quality_range=quality_range,
             default_quality_range=default_quality_range,

@@ -90,7 +90,7 @@ def get_color_spaces() -> list:
     Returns:
         list: A list of available color spaces.
     """
-    return list(set(COLOR_CLASSES) - {'sRGB'})
+    return list(set(COLOR_CLASSES) - {'sRGB'} - {'XYZ'})
 
 def convert(from_space: str, to_space: str, data: np.ndarray) -> np.ndarray:
     """
