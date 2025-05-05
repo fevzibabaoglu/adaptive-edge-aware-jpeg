@@ -47,8 +47,16 @@ class AMetricsComparison:
         'ssim', 
         'ms_ssim', 
         'lpips', 
-        'compression_ratio'
+        'compression_ratio',
     ]
+
+    # Define composite score weights
+    COMPOSITE_SCORE_WEIGHTS = {
+        'psnr_ratio': 0.10,
+        'ssim_ratio': 0.20,
+        'ms_ssim_ratio': 0.35,
+        'lpips_ratio': 0.35  # inverted
+    }
 
 
     def __init__(
@@ -125,7 +133,17 @@ class AMetricsComparison:
 
         return avg_df
 
-    def find_better_configurations(self, avg_df, filename):
+    def _calculate_composite_score(self, row):
+        """Calculate composite score based on the specified weights."""
+        psnr_component = AMetricsComparison.COMPOSITE_SCORE_WEIGHTS['psnr_ratio'] * row['psnr_ratio']
+        ssim_component = AMetricsComparison.COMPOSITE_SCORE_WEIGHTS['ssim_ratio'] * row['ssim_ratio']
+        ms_ssim_component = AMetricsComparison.COMPOSITE_SCORE_WEIGHTS['ms_ssim_ratio'] * row['ms_ssim_ratio']
+        lpips_component = AMetricsComparison.COMPOSITE_SCORE_WEIGHTS['lpips_ratio'] * (1 / row['lpips_ratio']) # inverted
+
+        composite_score = psnr_component + ssim_component + ms_ssim_component + lpips_component
+        return round(composite_score, 4)
+
+    def find_better_configurations(self, avg_df):
         """Find configurations that outperform standard JPEG settings."""
         quality_metrics = [m for m in AMetricsComparison.NUMERIC_COLUMNS if m != 'compression_ratio']
         better_compression_settings = []
@@ -133,15 +151,9 @@ class AMetricsComparison:
 
         for std in AMetricsComparison.STANDARD_JPEG_RESULTS:
             for _, alt_row in avg_df.iterrows():
-                # Compute compression and quality comparisons
-                compression_comparison = self._compression_comparison(std, alt_row)
-                metric_comparison = self._metric_comparison(std, alt_row, quality_metrics)
-
-                # Check if the alternative is better in terms of compression and quality
-                is_similar_compression = compression_comparison['is_similar']
-                is_better_compression = compression_comparison['is_better']
-                is_similar_quality = all(item['is_similar'] for item in metric_comparison)
-                is_better_quality = any(item['is_better'] for item in metric_comparison)
+                # Calculate compression and quality ratios
+                compression_ratio = self._calculate_compression_ratio(std, alt_row)
+                metric_ratio = self._calculate_metric_ratio(std, alt_row, quality_metrics)
 
                 # Create a comparison data structure
                 comparison = pd.Series({
@@ -155,9 +167,25 @@ class AMetricsComparison:
                 })
 
                 # Add the metrics to the comparison
-                for metric in metric_comparison:
+                for metric in metric_ratio:
                     comparison[f'{metric['metric']}_ratio'] = round(metric['ratio'], 4)
-                comparison['compression_ratio'] = round(compression_comparison['ratio'], 4)
+
+                # Calculate composite score and add to the comparison
+                composite_score = self._calculate_composite_score(comparison)
+                comparison['composite_score'] = composite_score
+
+                # Add compression ratio to the comparison
+                comparison['compression_ratio'] = round(compression_ratio, 4)
+
+                # Compute compression and quality comparison
+                compression_comparison = self._compression_comparison(compression_ratio)
+                metric_comparison = self._metric_comparison(composite_score)
+
+                # Check if the alternative is better in terms of compression and quality
+                is_similar_compression = compression_comparison['is_similar']
+                is_better_compression = compression_comparison['is_better']
+                is_similar_quality = metric_comparison['is_similar']
+                is_better_quality = metric_comparison['is_better']
 
                 # Better compression (similar quality, better compression)
                 if is_better_compression and (is_similar_quality or is_better_quality):
@@ -168,34 +196,28 @@ class AMetricsComparison:
 
         return better_compression_settings, better_quality_settings
 
-    def _compression_comparison(self, std, alt_row):
+    def _calculate_compression_ratio(self, std, alt_row):
+        return alt_row['compression_ratio'] / std['compression_ratio']
+
+    def _compression_comparison(self, ratio):
         """Compare the standard and alternative in terms of compression."""
-        ratio = alt_row['compression_ratio'] / std['compression_ratio']
         return {
-            'ratio': ratio,
             'is_similar': abs(ratio - 1) <= self.compression_threshold,
             'is_better': ratio - 1 > self.compression_threshold
         }
 
-    def _metric_comparison(self, std, alt_row, quality_metrics):
+    def _calculate_metric_ratio(self, std, alt_row, quality_metrics):
+        return [{
+            'metric': metric,
+            'ratio': alt_row[metric] / std[metric],
+        } for metric in quality_metrics]
+
+    def _metric_comparison(self, score):
         """Compare the standard and alternative in terms of quality metrics."""
-        results = []
-
-        for metric in quality_metrics:
-            ratio = alt_row[metric] / std[metric]
-            is_higher_better = metric not in ['lpips']
-
-            is_similar = abs(ratio - 1) <= self.quality_threshold
-            is_better = (ratio - 1) * (int(is_higher_better) * 2 - 1) > self.quality_threshold
-
-            results.append({
-                'metric': metric,
-                'ratio': ratio,
-                'is_similar': is_similar,
-                'is_better': is_better
-            })
-
-        return results
+        return {
+            'is_similar': abs(score - 1) <= self.compression_threshold,
+            'is_better': score - 1 > self.compression_threshold
+        }
 
     def save_consolidated_results(self):
         """Save consolidated better compression and quality results to CSV files."""
@@ -204,6 +226,13 @@ class AMetricsComparison:
         # Save better compression results
         if self.better_compression_settings:
             better_compression_df = pd.DataFrame(self.better_compression_settings)
+
+            # Sort by quality_compared_to (descending), then by compression_ratio (descending), then by composite_score (descending)
+            better_compression_df = better_compression_df.sort_values(
+                by=['quality_compared_to', 'compression_ratio', 'composite_score'], 
+                ascending=[False, False, False]
+            )
+
             compression_file = Path(f'{self.input_dir}/cr_{timestamp}_better_compression.csv')
             better_compression_df.to_csv(compression_file, index=False)
             print(f"Better compression configurations saved to: {compression_file} [{len(better_compression_df)} configurations]")
@@ -211,6 +240,13 @@ class AMetricsComparison:
         # Save better quality results
         if self.better_quality_settings:
             better_quality_df = pd.DataFrame(self.better_quality_settings)
+
+            # Sort by quality_compared_to (descending), then by composite_score (descending), then by compression_ratio (descending)
+            better_quality_df = better_quality_df.sort_values(
+                by=['quality_compared_to', 'composite_score', 'compression_ratio'], 
+                ascending=[False, False, False]
+            )
+
             quality_file = Path(f'{self.input_dir}/cr_{timestamp}_better_quality.csv')
             better_quality_df.to_csv(quality_file, index=False)
             print(f"Better quality configurations saved to: {quality_file} [{len(better_quality_df)} configurations]")
@@ -230,7 +266,7 @@ class AMetricsComparison:
             self.avg_dfs[file_path] = avg_df
 
             # Find better configurations
-            better_compression, better_quality = self.find_better_configurations(avg_df, file_path)
+            better_compression, better_quality = self.find_better_configurations(avg_df)
             self.better_compression_settings.extend(better_compression)
             self.better_quality_settings.extend(better_quality)
 
