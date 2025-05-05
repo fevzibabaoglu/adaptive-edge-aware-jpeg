@@ -23,7 +23,7 @@ from pathlib import Path
 
 
 class AnalysisMetrics:
-    # Standard JPEG results for comparison
+    # Standard JPEG results (YCbCr, 4:2:0, 8x8 blocks, fixed quality)
     STANDARD_JPEG_RESULTS = [
         {'quality': 10, 'psnr': 25.6922, 'ssim': 0.8877, 'ms_ssim': 0.9014, 'lpips': 0.2956, 'compression_ratio': 33.4996},
         {'quality': 25, 'psnr': 28.7196, 'ssim': 0.9572, 'ms_ssim': 0.9569, 'lpips': 0.1496, 'compression_ratio': 19.0805},
@@ -192,7 +192,7 @@ class AnalysisMetrics:
 
 if __name__ == "__main__":
     # Set input file path
-    input_file = "test_results/cr_test.csv"
+    input_file = "test_results/csv/cr_default.csv"
 
     # Create and run the analysis
     analysis = AnalysisMetrics(

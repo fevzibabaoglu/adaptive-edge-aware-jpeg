@@ -27,7 +27,6 @@ from itertools import product
 from pathlib import Path
 from PIL import Image as PILImage
 
-from color import get_color_spaces
 from image import EvaluationMetrics, Image
 from jpeg import Jpeg, JpegCompressionSettings
 
@@ -303,12 +302,10 @@ if __name__ == "__main__":
 
     # Set result file path
     timestamp = time.strftime("%Y%m%d-%H%M%S")
-    result_file = Path(f'test_results/cr_{timestamp}.csv')
+    result_file = Path(f'test_results/csv/cr_{timestamp}.csv')
 
     # Define color spaces
-    color_spaces = get_color_spaces()
-    color_spaces.remove('XYZ')
-    color_spaces.remove('YCoCg-R')
+    color_spaces = ['YCbCr']
 
     # Define quality combinations
     quality_values = (10, 25, 50, 75, 90)
@@ -333,5 +330,6 @@ if __name__ == "__main__":
         color_spaces=color_spaces,
         quality_ranges=quality_ranges,
         block_size_ranges=block_size_ranges,
+        n_workers=4,
     )
     analysis.run()
