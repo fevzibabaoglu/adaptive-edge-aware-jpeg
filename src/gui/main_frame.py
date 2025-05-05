@@ -99,7 +99,7 @@ class JpegApp:
         self.preview_panel = PreviewPanel(
             self.main_frame,
             process_function=self._process_preview,
-            preview_path='images/lena.png',
+            preview_path='test_images/lena.png',
             filetypes=image_filetypes,
         )
         self.preview_panel.frame.pack(side='right', fill='both', expand=True)
