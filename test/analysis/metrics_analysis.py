@@ -146,7 +146,7 @@ class AMetricsAnalysis:
             ax.set_title(f'{color_space}')
             ax.set_xticks(x)
             ax.set_xticklabels(subsampling)
-            ax.set_ylim(0.6, 1.4)
+            ax.set_ylim(1.0, 1.4)
             ax.grid(axis='y', linestyle='--', alpha=0.7)
 
         # Add legend (only once)
