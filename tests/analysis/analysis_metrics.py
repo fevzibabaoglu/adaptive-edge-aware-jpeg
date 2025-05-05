@@ -25,11 +25,11 @@ from pathlib import Path
 class AnalysisMetrics:
     # Standard JPEG results (YCbCr, 4:2:0, 8x8 blocks, fixed quality)
     STANDARD_JPEG_RESULTS = [
-        {'quality': 10, 'psnr': 25.6922, 'ssim': 0.8877, 'ms_ssim': 0.9014, 'lpips': 0.2956, 'compression_ratio': 33.4996},
-        {'quality': 25, 'psnr': 28.7196, 'ssim': 0.9572, 'ms_ssim': 0.9569, 'lpips': 0.1496, 'compression_ratio': 19.0805},
-        {'quality': 50, 'psnr': 30.8579, 'ssim': 0.9797, 'ms_ssim': 0.9759, 'lpips': 0.0832, 'compression_ratio': 12.9556},
-        {'quality': 75, 'psnr': 33.1062, 'ssim': 0.9901, 'ms_ssim': 0.9855, 'lpips': 0.0435, 'compression_ratio': 9.0690},
-        {'quality': 90, 'psnr': 36.3888, 'ssim': 0.9964, 'ms_ssim': 0.9925, 'lpips': 0.0148, 'compression_ratio': 5.7528},
+        {'quality': 10, 'psnr': 25.6922, 'ssim': 0.8877, 'ms_ssim': 0.9014, 'lpips': 0.2956, 'compression_ratio': 26.3875},
+        {'quality': 25, 'psnr': 28.7196, 'ssim': 0.9572, 'ms_ssim': 0.9569, 'lpips': 0.1496, 'compression_ratio': 15.4089},
+        {'quality': 50, 'psnr': 30.8579, 'ssim': 0.9797, 'ms_ssim': 0.9759, 'lpips': 0.0832, 'compression_ratio': 10.4945},
+        {'quality': 75, 'psnr': 33.1062, 'ssim': 0.9901, 'ms_ssim': 0.9855, 'lpips': 0.0435, 'compression_ratio': 7.3001},
+        {'quality': 90, 'psnr': 36.3888, 'ssim': 0.9964, 'ms_ssim': 0.9925, 'lpips': 0.0148, 'compression_ratio': 4.5639},
     ]
 
     # Define column groups
@@ -85,16 +85,6 @@ class AnalysisMetrics:
         # Save to CSV
         self.avg_df.to_csv(output_file, index=False)
         print(f"Averaged results saved to: {output_file} [{len(self.avg_df)} unique configurations]")
-
-    def find_standard_jpeg_settings(self):
-        """Find settings that match standard JPEG configuration (YCbCr, 8x8 blocks, fixed quality)."""
-        standard_df = self.avg_df[
-            (self.avg_df['color_space'] == 'YCbCr') & 
-            (self.avg_df['min_block_size'] == 8) & 
-            (self.avg_df['max_block_size'] == 8) &
-            (self.avg_df['min_quality'] == self.avg_df['max_quality'])
-        ]
-        return standard_df.sort_values(by='min_quality')
 
     def find_better_configurations(self):
         """Find configurations that outperform standard JPEG settings."""
