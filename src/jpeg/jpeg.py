@@ -59,12 +59,13 @@ class JpegCompressionSettings:
     ], dtype=np.float32)
 
     # Color space settings
+    # ! SET THESE WITH BEST OPTIONS
     COLOR_SPACE_SETTINGS = {
         'ICaCb': {
             'downsampling_ratios': np.array([
                 [1, 1],  # I
-                [1, 1],  # ca
-                [1, 1],  # cb
+                [1, 4],  # ca
+                [1, 4],  # cb
             ]),
             'quantization_matrices': [
                 LUMINANCE_QUANTIZATION_MATRIX,
@@ -75,8 +76,8 @@ class JpegCompressionSettings:
         'ICtCp': {
             'downsampling_ratios': np.array([
                 [1, 1],  # I
-                [1, 1],  # ct
-                [1, 1],  # cp
+                [1, 4],  # ct
+                [1, 4],  # cp
             ]),
             'quantization_matrices': [
                 LUMINANCE_QUANTIZATION_MATRIX,
@@ -87,8 +88,8 @@ class JpegCompressionSettings:
         'JzAzBz': {
             'downsampling_ratios': np.array([
                 [1, 1],  # jz
-                [1, 1],  # az
-                [1, 1],  # bz
+                [2, 2],  # az
+                [2, 2],  # bz
             ]),
             'quantization_matrices': [
                 LUMINANCE_QUANTIZATION_MATRIX,
@@ -99,8 +100,8 @@ class JpegCompressionSettings:
         'OKLAB': {
             'downsampling_ratios': np.array([
                 [1, 1],  # l
-                [1, 1],  # a
-                [1, 1],  # b
+                [2, 2],  # a
+                [2, 2],  # b
             ]),
             'quantization_matrices': [
                 LUMINANCE_QUANTIZATION_MATRIX,
@@ -123,7 +124,7 @@ class JpegCompressionSettings:
         'YCoCg': {
             'downsampling_ratios': np.array([
                 [1, 1],  # lum (y)
-                [2, 4],  # chrom_1 (co)
+                [2, 2],  # chrom_1 (co)
                 [2, 2],  # chrom_2 (cg)
             ]),
             'quantization_matrices': [
@@ -135,7 +136,7 @@ class JpegCompressionSettings:
         'YCoCg-R': {
             'downsampling_ratios': np.array([
                 [1, 1],  # lum (y)
-                [2, 4],  # chrom_1 (co)
+                [2, 2],  # chrom_1 (co)
                 [2, 2],  # chrom_2 (cg)
             ]),
             'quantization_matrices': [
