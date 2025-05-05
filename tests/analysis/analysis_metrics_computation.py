@@ -297,7 +297,7 @@ class AnalysisMetricsComputation:
 
 if __name__ == "__main__":
     # Define image files
-    img_dir = Path('images')
+    img_dir = Path('test_images')
     img_extensions = ['.png', '.tiff', '.bmp']
     img_files = [path for path in img_dir.rglob('*') if path.is_file() and path.suffix in img_extensions]
 

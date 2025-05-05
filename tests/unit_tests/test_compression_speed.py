@@ -27,7 +27,7 @@ from jpeg import Jpeg, JpegCompressionSettings
 class TestCompressionSpeed(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.test_image = "images/lena.png"
+        cls.test_image = "test_images/lena.png"
 
     def test_compression_performance(self):
         """Test the performance of custom compression with different block sizes."""

@@ -92,7 +92,7 @@ class AnalysisQuadTree:
 
 if __name__ == "__main__":
     analysis = AnalysisQuadTree(
-        img_dir='images',
+        img_dir='test_images',
         test_dir="test_results",
     )
     analysis.run(
