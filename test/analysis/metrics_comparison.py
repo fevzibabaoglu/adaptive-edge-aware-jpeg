@@ -233,7 +233,7 @@ class AMetricsComparison:
                 ascending=[False, False, False]
             )
 
-            compression_file = Path(f'{self.input_dir}/cr_{timestamp}_better_compression.csv')
+            compression_file = Path(f'{self.input_dir}/better_compression_{timestamp}.csv')
             better_compression_df.to_csv(compression_file, index=False)
             print(f"Better compression configurations saved to: {compression_file} [{len(better_compression_df)} configurations]")
 
@@ -247,7 +247,7 @@ class AMetricsComparison:
                 ascending=[False, False, False]
             )
 
-            quality_file = Path(f'{self.input_dir}/cr_{timestamp}_better_quality.csv')
+            quality_file = Path(f'{self.input_dir}/better_quality_{timestamp}.csv')
             better_quality_df.to_csv(quality_file, index=False)
             print(f"Better quality configurations saved to: {quality_file} [{len(better_quality_df)} configurations]")
 
