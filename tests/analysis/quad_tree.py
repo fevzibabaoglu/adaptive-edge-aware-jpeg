@@ -28,7 +28,7 @@ from jpeg.quadtree import QuadTree
 from jpeg.edge_detection import EdgeDetection
 
 
-class AnalysisQuadTree:
+class AQuadTree:
     def __init__(self, img_dir, test_dir):
         self.img_dir = Path(img_dir)
         self.test_dir = Path(test_dir)
@@ -91,7 +91,7 @@ class AnalysisQuadTree:
 
 
 if __name__ == "__main__":
-    analysis = AnalysisQuadTree(
+    analysis = AQuadTree(
         img_dir='test_images',
         test_dir="test_results",
     )

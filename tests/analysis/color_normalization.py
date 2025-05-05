@@ -22,7 +22,7 @@ import numpy as np
 from color import convert, get_color_spaces
 
 
-class AnalysisClassNormalization:
+class AColorNormalization:
     def run(self):
         original_rgb = np.array(np.meshgrid(
             np.arange(256), np.arange(256), np.arange(256), indexing='ij'
@@ -48,5 +48,5 @@ class AnalysisClassNormalization:
 
 
 if __name__ == "__main__":
-    analysis = AnalysisClassNormalization()
+    analysis = AColorNormalization()
     analysis.run()

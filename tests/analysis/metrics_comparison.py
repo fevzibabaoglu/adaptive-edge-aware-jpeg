@@ -23,7 +23,7 @@ import pandas as pd
 from pathlib import Path
 
 
-class AnalysisMetrics:
+class AMetricsComparison:
     # Standard JPEG results (YCbCr, 4:2:0, 8x8 blocks, fixed quality)
     STANDARD_JPEG_RESULTS = [
         {'quality': 10, 'psnr': 25.6922, 'ssim': 0.8877, 'ms_ssim': 0.9014, 'lpips': 0.2956, 'compression_ratio': 26.3875},
@@ -113,10 +113,10 @@ class AnalysisMetrics:
         output_file = Path(f'{self.input_dir}/{base_name}_avg.csv')
 
         # Group and calculate averages
-        avg_df = df.groupby(AnalysisMetrics.GROUPING_COLUMNS)[AnalysisMetrics.NUMERIC_COLUMNS].mean().reset_index()
+        avg_df = df.groupby(AMetricsComparison.GROUPING_COLUMNS)[AMetricsComparison.NUMERIC_COLUMNS].mean().reset_index()
 
         # Round the averages to 4 decimal places for readability
-        for col in AnalysisMetrics.NUMERIC_COLUMNS:
+        for col in AMetricsComparison.NUMERIC_COLUMNS:
             avg_df[col] = avg_df[col].round(4)
 
         # Save to CSV
@@ -127,11 +127,11 @@ class AnalysisMetrics:
 
     def find_better_configurations(self, avg_df, filename):
         """Find configurations that outperform standard JPEG settings."""
-        quality_metrics = [m for m in AnalysisMetrics.NUMERIC_COLUMNS if m != 'compression_ratio']
+        quality_metrics = [m for m in AMetricsComparison.NUMERIC_COLUMNS if m != 'compression_ratio']
         better_compression_settings = []
         better_quality_settings = []
 
-        for std in AnalysisMetrics.STANDARD_JPEG_RESULTS:
+        for std in AMetricsComparison.STANDARD_JPEG_RESULTS:
             for _, alt_row in avg_df.iterrows():
                 # Compute compression and quality comparisons
                 compression_comparison = self._compression_comparison(std, alt_row)
@@ -239,7 +239,7 @@ class AnalysisMetrics:
 
 
 if __name__ == "__main__":
-    analysis = AnalysisMetrics(
+    analysis = AMetricsComparison(
         input_dir="test_results/csv",
         file_list=None,
         quality_threshold=0.05,

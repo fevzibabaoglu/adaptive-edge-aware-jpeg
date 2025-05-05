@@ -31,90 +31,7 @@ from image import EvaluationMetrics, Image
 from jpeg import Jpeg, JpegCompressionSettings
 
 
-def process_image_combination(args):
-    """Process a single image with multiple compression settings combinations."""
-    img_path, color_spaces, quality_ranges, block_size_ranges, progress_queue = args
-
-    # Load the image only once for all combinations
-    try:
-        img = Image.load(img_path)
-    except Exception as e:
-        progress_queue.put(("error", f"Error loading image {img_path.name}: {str(e)}"))
-        return [], []
-
-    # Create a JPEG compressor to reuse
-    jpeg = Jpeg(JpegCompressionSettings())
-
-    results = []
-    errors = []
-
-    # Calculate uncompressed size once
-    uncompressed_size = len(PILImage.fromarray(img.get_uint8()).tobytes())
-
-    # Total combinations for this image
-    total_combinations = len(color_spaces) * len(quality_ranges) * len(block_size_ranges)
-    completed = 0
-
-    # Process all combinations for this image
-    for color_space, quality_range, block_size_range in product(
-        color_spaces, quality_ranges, block_size_ranges
-    ):
-        try:
-            # Update JPEG compressor with current settings
-            jpeg.update_settings(JpegCompressionSettings(
-                color_space=color_space,
-                quality_range=quality_range,
-                block_size_range=block_size_range,
-            ))
-
-            # Compress and decompress
-            compressed = jpeg.compress(img)
-            output_img = jpeg.decompress(compressed)
-
-            # Calculate compression ratio
-            compressed_size = len(compressed)
-            compression_ratio = uncompressed_size / compressed_size
-
-            # Calculate evaluation metrics
-            eval = EvaluationMetrics(img, output_img)
-            psnr = eval.psnr()
-            ssim = eval.ssim()
-            ms_ssim = eval.ms_ssim()
-            lpips = eval.lpips()
-
-            result = {
-                'image_name': str(img_path),
-                'color_space': color_space,
-                'min_quality': quality_range[0],
-                'max_quality': quality_range[1],
-                'min_block_size': block_size_range[0],
-                'max_block_size': block_size_range[1],
-                'psnr': f'{psnr:.4f}',
-                'ssim': f'{ssim:.4f}',
-                'ms_ssim': f'{ms_ssim:.4f}',
-                'lpips': f'{lpips:.4f}',
-                'compression_ratio': f'{compression_ratio:.4f}',
-            }
-            results.append(result)
-
-        except Exception as e:
-            error_msg = f"Error processing {img_path.name} with {color_space}, Q:{quality_range}, B:{block_size_range}: {str(e)}"
-            errors.append(error_msg)
-
-        # Update progress after each combination
-        completed += 1
-        progress_queue.put(("progress", {
-            "image": str(img_path),
-            "completed": completed,
-            "total": total_combinations
-        }))
-
-    # Signal that this image is completely done
-    progress_queue.put(("complete", str(img_path)))
-    return results, errors
-
-
-class AnalysisMetricsComputation:
+class AMetricsComputation:
     def __init__(
         self, 
         img_files, 
@@ -217,6 +134,89 @@ class AnalysisMetricsComputation:
             f"Elapsed: {elapsed} | Remaining: {remaining}"
         )
 
+    @staticmethod
+    def process_image_combination(args):
+        """Process a single image with multiple compression settings combinations."""
+        img_path, color_spaces, quality_ranges, block_size_ranges, progress_queue = args
+
+        # Load the image only once for all combinations
+        try:
+            img = Image.load(img_path)
+        except Exception as e:
+            progress_queue.put(("error", f"Error loading image {img_path.name}: {str(e)}"))
+            return [], []
+
+        # Create a JPEG compressor to reuse
+        jpeg = Jpeg(JpegCompressionSettings())
+
+        results = []
+        errors = []
+
+        # Calculate uncompressed size once
+        uncompressed_size = len(PILImage.fromarray(img.get_uint8()).tobytes())
+
+        # Total combinations for this image
+        total_combinations = len(color_spaces) * len(quality_ranges) * len(block_size_ranges)
+        completed = 0
+
+        # Process all combinations for this image
+        for color_space, quality_range, block_size_range in product(
+            color_spaces, quality_ranges, block_size_ranges
+        ):
+            try:
+                # Update JPEG compressor with current settings
+                jpeg.update_settings(JpegCompressionSettings(
+                    color_space=color_space,
+                    quality_range=quality_range,
+                    block_size_range=block_size_range,
+                ))
+
+                # Compress and decompress
+                compressed = jpeg.compress(img)
+                output_img = jpeg.decompress(compressed)
+
+                # Calculate compression ratio
+                compressed_size = len(compressed)
+                compression_ratio = uncompressed_size / compressed_size
+
+                # Calculate evaluation metrics
+                eval = EvaluationMetrics(img, output_img)
+                psnr = eval.psnr()
+                ssim = eval.ssim()
+                ms_ssim = eval.ms_ssim()
+                lpips = eval.lpips()
+
+                result = {
+                    'image_name': str(img_path),
+                    'color_space': color_space,
+                    'min_quality': quality_range[0],
+                    'max_quality': quality_range[1],
+                    'min_block_size': block_size_range[0],
+                    'max_block_size': block_size_range[1],
+                    'psnr': f'{psnr:.4f}',
+                    'ssim': f'{ssim:.4f}',
+                    'ms_ssim': f'{ms_ssim:.4f}',
+                    'lpips': f'{lpips:.4f}',
+                    'compression_ratio': f'{compression_ratio:.4f}',
+                }
+                results.append(result)
+
+            except Exception as e:
+                error_msg = f"Error processing {img_path.name} with {color_space}, Q:{quality_range}, B:{block_size_range}: {str(e)}"
+                errors.append(error_msg)
+
+            # Update progress after each combination
+            completed += 1
+            progress_queue.put(("progress", {
+                "image": str(img_path),
+                "completed": completed,
+                "total": total_combinations
+            }))
+
+        # Signal that this image is completely done
+        progress_queue.put(("complete", str(img_path)))
+        return results, errors
+
     def run(self):
         # Get analysis summary
         total_combinations, summary = self.get_summary()
@@ -252,7 +252,7 @@ class AnalysisMetricsComputation:
         # Use ProcessPoolExecutor for parallel processing
         with ProcessPoolExecutor(max_workers=self.n_workers) as executor:
             # Submit all tasks
-            future_to_img = {executor.submit(process_image_combination, args): args[0] for args in process_args}
+            future_to_img = {executor.submit(AMetricsComputation.process_image_combination, args): args[0] for args in process_args}
 
             # Process results as they complete
             for future in as_completed(future_to_img):
@@ -324,7 +324,7 @@ if __name__ == "__main__":
                 block_size_ranges.append((min_size, max_size))
 
     # Run analysis
-    analysis = AnalysisMetricsComputation(
+    analysis = AMetricsComputation(
         img_files=img_files,
         result_file=result_file,
         color_spaces=color_spaces,
