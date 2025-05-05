@@ -34,22 +34,18 @@ class ControlPanel:
         on_change_callback,
         on_compress_callback,
         on_decompress_callback,
-        color_spaces=["YCbCr", "YCoCg", "OKLAB", "RGB", "HSV", "YUV"],
-        default_color_space="YCoCg",
-        quality_range=(1, 99),
-        default_quality_range=(20, 60),
-        block_size_range=(1, 8),
-        default_block_size_range=(2, 6),
+        color_spaces,
+        default_color_space,
+        quality_range,
+        default_quality_range,
+        block_size_range,
+        default_block_size_range,
+        filetypes,
         slider_width=280,
         slider_height=40,
         slider_color="#4a86e8",
         file_select_text="Select Images for Processing",
         process_button_text="Process All Selected Images",
-        filetypes=(
-            ("Image files", "*.jpg *.jpeg *.png *.bmp *.tiff"),
-            ("AJPG files", "*.ajpg"),
-            ("All files", "*.*")
-        ),
         padding=10,
         files_text_height=4,
         files_text_width=30
@@ -68,12 +64,12 @@ class ControlPanel:
             default_quality_range: Default (min, max) for quality slider
             block_size_range: Tuple of (min, max) for block size slider powers
             default_block_size_range: Default (min, max) for block size slider
+            filetypes: Tuple of file type filters for file dialog
             slider_width: Width of range sliders
             slider_height: Height of range sliders
             slider_color: Color for slider selection
             file_select_text: Text for file selection button
             process_button_text: Text for process button
-            filetypes: Tuple of file type filters for file dialog
             padding: Padding for the label frames
             files_text_height: Height of the files text area
             files_text_width: Width of the files text area

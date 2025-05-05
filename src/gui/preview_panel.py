@@ -33,13 +33,10 @@ class PreviewPanel:
         self,
         parent,
         process_function,
-        preview_path=None,
+        preview_path,
+        filetypes,
         title="Preview",
         canvas_bg="#f0f0f0",
-        filetypes=(
-            ("Image files", "*.jpg *.jpeg *.png *.bmp *.tiff"),
-            ("All files", "*.*")
-        ),
         padding=10,
         initial_load_delay=100
     ):
@@ -50,9 +47,9 @@ class PreviewPanel:
             parent: Parent tkinter widget
             process_function: Function that processes images
             preview_path: Path to initial preview image
+            filetypes: Tuple of file type filters for file dialog
             title: Title for the panel frame
             canvas_bg: Background color for the canvas
-            filetypes: Tuple of file type filters for file dialog
             padding: Padding for the label frame
             initial_load_delay: Delay in ms before loading initial preview
         """
