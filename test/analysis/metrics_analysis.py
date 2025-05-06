@@ -175,7 +175,7 @@ class AMetricsAnalysis:
         plt.tight_layout(rect=[0, 0.08, 1, 0.95])
         plt.show()
 
-    def compare_strategies(self):
+    def compare_strategies(self, top_n=5):
         """
         Find the best settings per strategy for both compression and quality.
 
@@ -190,6 +190,7 @@ class AMetricsAnalysis:
         # Compression priority - preserve quality
         comp_soft_df = AMetricsAnalysis._best_by_metric(
             df=self.df_compression,
+            top_n=top_n,
             primary_metric='compression_ratio',
             secondary_metric='composite_score',
             preserve_secondary=True,
@@ -203,6 +204,7 @@ class AMetricsAnalysis:
         # Compression priority - ignore quality
         comp_hard_df = AMetricsAnalysis._best_by_metric(
             df=self.df_compression,
+            top_n=top_n,
             primary_metric='compression_ratio',
             preserve_secondary=False,
         )
@@ -214,6 +216,7 @@ class AMetricsAnalysis:
         # Quality priority - preserve compression
         qual_soft_df = AMetricsAnalysis._best_by_metric(
             df=self.df_quality,
+            top_n=top_n,
             primary_metric='composite_score',
             secondary_metric='compression_ratio',
             preserve_secondary=True,
@@ -227,6 +230,7 @@ class AMetricsAnalysis:
         # Quality priority - ignore compression
         qual_hard_df = AMetricsAnalysis._best_by_metric(
             df=self.df_quality,
+            top_n=top_n,
             primary_metric='composite_score',
             preserve_secondary=False,
         )
@@ -236,15 +240,22 @@ class AMetricsAnalysis:
         )
 
     @staticmethod
-    def _best_by_metric(df, primary_metric, secondary_metric=None, preserve_secondary=False, min_threshold=1.0):
+    def _best_by_metric(
+        df,
+        top_n,
+        primary_metric,
+        secondary_metric=None,
+        preserve_secondary=False,
+        min_threshold=1.0,
+    ):
         """
-        For each quality_compared_to value, select the row with the highest value 
+        For each quality_compared_to value, select the top `top_n` rows with the highest
         of the primary metric, optionally preserving a minimum threshold for the secondary metric.
         """
         # Only use allowed subsampling settings
         df_allowed = df[df['subsampling'] == df['color_space'].map(AMetricsAnalysis.DEFINED_SUBSAMPLING)]
 
-        best_rows = []
+        top_rows = []
         groups = df_allowed.groupby('quality_compared_to', as_index=False)
 
         for quality_val, group in groups:
@@ -258,11 +269,11 @@ class AMetricsAnalysis:
             if group.empty:
                 continue
 
-            # Find the row with the maximum primary metric
-            best_idx = group[primary_metric].idxmax()
-            best_rows.append(group.loc[best_idx])
+            # Find the rows with the maximum primary metric
+            best = group.nlargest(top_n, primary_metric)
+            top_rows.append(best)
 
-        return pd.DataFrame(best_rows).reset_index(drop=True)
+        return pd.concat(top_rows, ignore_index=True)
 
 
 if __name__ == "__main__":
@@ -273,3 +284,4 @@ if __name__ == "__main__":
     )
 
     analysis.subsampling_analysis(visualize=True)
+    analysis.compare_strategies(top_n=5)
