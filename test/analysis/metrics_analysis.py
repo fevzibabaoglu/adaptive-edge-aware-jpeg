@@ -24,6 +24,18 @@ import numpy as np
 
 
 class AMetricsAnalysis:
+    # Predefined subsampling per color space
+    DEFINED_SUBSAMPLING = {
+        'ICaCb': '4:1:1',
+        'ICtCp': '4:1:1',
+        'JzAzBz': '4:2:0',
+        'OKLAB': '4:2:0',
+        'YCbCr': '4:2:0',
+        'YCoCg': '4:2:0',
+        'YCoCg-R': '4:2:0',
+    }
+
+
     def __init__(
         self,
         results_dir,
@@ -162,6 +174,95 @@ class AMetricsAnalysis:
 
         plt.tight_layout(rect=[0, 0.08, 1, 0.95])
         plt.show()
+
+    def compare_strategies(self):
+        """
+        Find the best settings per strategy for both compression and quality.
+
+        For compression priority:
+            1. "soft": Preserves composite_score >= 1.0
+            2. "hard": Ignores composite_score
+
+        For quality priority:
+            1. "soft": Preserves compression_ratio >= 1.0
+            2. "hard": Ignores compression_ratio
+        """
+        # Compression priority - preserve quality
+        comp_soft_df = AMetricsAnalysis._best_by_metric(
+            df=self.df_compression,
+            primary_metric='compression_ratio',
+            secondary_metric='composite_score',
+            preserve_secondary=True,
+            min_threshold=1.0,
+        )
+        comp_soft_df.to_csv(
+            os.path.join(self.results_dir, 'best_compression_soft.csv'),
+            index=False
+        )
+
+        # Compression priority - ignore quality
+        comp_hard_df = AMetricsAnalysis._best_by_metric(
+            df=self.df_compression,
+            primary_metric='compression_ratio',
+            preserve_secondary=False,
+        )
+        comp_hard_df.to_csv(
+            os.path.join(self.results_dir, 'best_compression_hard.csv'),
+            index=False
+        )
+
+        # Quality priority - preserve compression
+        qual_soft_df = AMetricsAnalysis._best_by_metric(
+            df=self.df_quality,
+            primary_metric='composite_score',
+            secondary_metric='compression_ratio',
+            preserve_secondary=True,
+            min_threshold=1.0,
+        )
+        qual_soft_df.to_csv(
+            os.path.join(self.results_dir, 'best_quality_soft.csv'),
+            index=False
+        )
+
+        # Quality priority - ignore compression
+        qual_hard_df = AMetricsAnalysis._best_by_metric(
+            df=self.df_quality,
+            primary_metric='composite_score',
+            preserve_secondary=False,
+        )
+        qual_hard_df.to_csv(
+            os.path.join(self.results_dir, 'best_quality_hard.csv'),
+            index=False
+        )
+
+    @staticmethod
+    def _best_by_metric(df, primary_metric, secondary_metric=None, preserve_secondary=False, min_threshold=1.0):
+        """
+        For each quality_compared_to value, select the row with the highest value 
+        of the primary metric, optionally preserving a minimum threshold for the secondary metric.
+        """
+        # Only use allowed subsampling settings
+        df_allowed = df[df['subsampling'] == df['color_space'].map(AMetricsAnalysis.DEFINED_SUBSAMPLING)]
+
+        best_rows = []
+        groups = df_allowed.groupby('quality_compared_to', as_index=False)
+
+        for quality_val, group in groups:
+            # Apply secondary metric filter if needed
+            if preserve_secondary and secondary_metric:
+                filtered_group = group[group[secondary_metric] >= min_threshold]
+                # Only use filtered group if it's not empty
+                if not filtered_group.empty:
+                    group = filtered_group
+
+            if group.empty:
+                continue
+
+            # Find the row with the maximum primary metric
+            best_idx = group[primary_metric].idxmax()
+            best_rows.append(group.loc[best_idx])
+
+        return pd.DataFrame(best_rows).reset_index(drop=True)
 
 
 if __name__ == "__main__":
