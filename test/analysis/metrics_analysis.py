@@ -44,33 +44,13 @@ class AMetricsAnalysis:
           1. Compression ratio (median and mean) from the compression dataset.
           2. Composite quality score (median and mean) from the quality dataset.
         """
-        # Aggregation helper function
-        def compute_stats(df: pd.DataFrame, key: str, secondary: str) -> pd.DataFrame:
-            """Group by color_space and subsampling, then compute median and mean for key and secondary."""
-            stats = (
-                df
-                .groupby(['color_space', 'subsampling'])
-                .agg(
-                    **{
-                        f"{key}_median": (key, 'median'),
-                        f"{secondary}_median": (secondary, 'median'),
-                        f"{key}_mean": (key, 'mean'),
-                        f"{secondary}_mean": (secondary, 'mean'),
-                    }
-                )
-                .reset_index()
-            )
-            numeric_cols = stats.select_dtypes(include='number').columns
-            stats[numeric_cols] = stats[numeric_cols].round(4)
-            return stats
-
         # Compute stats for both datasets
-        compression_stats = compute_stats(
+        compression_stats = AMetricsAnalysis._compute_stats(
             self.df_compression,
             key='compression_ratio',
             secondary='composite_score'
         )
-        quality_stats = compute_stats(
+        quality_stats = AMetricsAnalysis._compute_stats(
             self.df_quality,
             key='composite_score',
             secondary='compression_ratio'
@@ -92,6 +72,26 @@ class AMetricsAnalysis:
                 compression_stats,
                 quality_stats,
             )
+
+    @staticmethod
+    def _compute_stats(df, key, secondary):
+        """Group by color_space and subsampling, then compute median and mean for key and secondary."""
+        stats = (
+            df
+            .groupby(['color_space', 'subsampling'])
+            .agg(
+                **{
+                    f"{key}_median": (key, 'median'),
+                    f"{secondary}_median": (secondary, 'median'),
+                    f"{key}_mean": (key, 'mean'),
+                    f"{secondary}_mean": (secondary, 'mean'),
+                }
+            )
+            .reset_index()
+        )
+        numeric_cols = stats.select_dtypes(include='number').columns
+        stats[numeric_cols] = stats[numeric_cols].round(4)
+        return stats
 
     @staticmethod
     def _visualize_subsampling_analysis(compression_stats, quality_stats):
