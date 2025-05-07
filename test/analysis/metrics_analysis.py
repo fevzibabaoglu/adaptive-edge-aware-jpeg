@@ -21,6 +21,8 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.colors import ListedColormap
+from matplotlib.patches import Patch
 
 
 class AMetricsAnalysis:
@@ -256,6 +258,14 @@ class AMetricsAnalysis:
                 qual_hard_df,
                 filename='settings_tradeoff_analysis.png',
             )
+            self._visualize_dominant_settings_analysis(
+                comp_soft_df,
+                comp_hard_df,
+                qual_soft_df,
+                qual_hard_df,
+                setting_name='color_space',
+                filename_template='settings_dominant_{}_analysis.png',
+            )
 
     @staticmethod
     def _best_by_metric(
@@ -359,6 +369,89 @@ class AMetricsAnalysis:
         fig.suptitle('Settings Analysis', fontsize=16)
 
         plt.tight_layout(rect=[0, 0, 1, 0.96])
+        fig.savefig(os.path.join(self.figures_dir, filename), dpi=300, bbox_inches='tight')
+        plt.show()
+
+    def _visualize_dominant_settings_analysis(
+        self,
+        comp_soft,
+        comp_hard,
+        qual_soft,
+        qual_hard,
+        setting_name='color_space',
+        filename_template='settings_dominant_{}_analysis.png'
+    ):
+        """
+        Plot a heatmap showing, for each quality target and strategy,
+        the dominant setting value.
+        """
+        # Set the filename
+        filename = filename_template.format(setting_name)
+
+        combined = pd.concat([
+            comp_hard.assign(strategy='Compression Hard'),
+            comp_soft.assign(strategy='Compression Soft'),
+            qual_hard.assign(strategy='Quality Hard'),
+            qual_soft.assign(strategy='Quality Soft')
+        ], ignore_index=True)
+
+        qualities = sorted(combined['quality_compared_to'].unique(), reverse=True)
+        strategies = ['Compression Hard', 'Compression Soft', 'Quality Hard', 'Quality Soft']
+
+        # Compute modal values
+        n_q, n_s = len(qualities), len(strategies)
+        modal = np.full((n_q, n_s), np.nan, dtype=object)
+        for i, q in enumerate(qualities):
+            for j, strat in enumerate(strategies):
+                subset = combined[
+                    (combined['quality_compared_to'] == q) &
+                    (combined['strategy'] == strat)
+                ]
+                if not subset.empty:
+                    modal[i, j] = subset[setting_name].mode().iloc[0]
+
+        # Color mapping
+        vals = sorted({v for v in modal.flatten() if v is not np.nan})
+        cmap = ListedColormap(plt.cm.tab10.colors[:len(vals)])
+        idx_map = {v: i for i, v in enumerate(vals)}
+        colors = np.vectorize(lambda v: idx_map.get(v, np.nan))(modal)
+
+        # Plot
+        fig, ax = plt.subplots(figsize=(10, max(6, n_q * 0.6)))
+        ax.imshow(colors, aspect='auto', cmap=cmap)
+
+        # Annotate
+        for i in range(n_q):
+            for j in range(n_s):
+                v = modal[i, j]
+                if v is not np.nan:
+                    ax.text(j, i, str(v), ha='center', va='center')
+
+        # Axes
+        ax.set_xticks(range(n_s))
+        ax.set_xticklabels(strategies)
+        ax.set_yticks(range(n_q))
+        ax.set_yticklabels(qualities)
+
+        # Grid lines between cells
+        ax.set_xticks(np.arange(-.5, n_s, 1), minor=True)
+        ax.set_yticks(np.arange(-.5, n_q, 1), minor=True)
+        ax.grid(which='minor', color='white', linewidth=1.5)
+        ax.tick_params(which='minor', length=0)
+
+        # Legend & title
+        patches = [Patch(facecolor=cmap(i), label=v) for i, v in enumerate(vals)]
+        ax.legend(
+            handles=patches,
+            title=setting_name.replace('_', ' ').title(),
+            loc='upper center',
+            bbox_to_anchor=(0.5, -0.15),
+            ncol=min(5, len(vals))
+        )
+        ax.set_title(f'Dominant {setting_name.replace("_", " ").title()} Settings')
+        ax.set_ylabel('Quality Compared To')
+
+        plt.tight_layout()
         fig.savefig(os.path.join(self.figures_dir, filename), dpi=300, bbox_inches='tight')
         plt.show()
 
