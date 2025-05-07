@@ -183,7 +183,7 @@ class AMetricsAnalysis:
         plt.savefig(os.path.join(self.figures_dir, filename), dpi=300, bbox_inches='tight')
         plt.show()
 
-    def compare_strategies(self, top_n=5):
+    def settings_analysis(self, top_n=5, visualize=False):
         """
         Find the best settings per strategy for both compression and quality.
 
@@ -247,6 +247,16 @@ class AMetricsAnalysis:
             index=False
         )
 
+        # Visualize the results
+        if visualize:
+            self._visualize_settings_tradeoff_analysis(
+                comp_soft_df,
+                comp_hard_df,
+                qual_soft_df,
+                qual_hard_df,
+                filename='settings_tradeoff_analysis.png',
+            )
+
     @staticmethod
     def _best_by_metric(
         df,
@@ -283,6 +293,75 @@ class AMetricsAnalysis:
 
         return pd.concat(top_rows, ignore_index=True)
 
+    def _visualize_settings_tradeoff_analysis(
+        self,
+        comp_soft,
+        comp_hard,
+        qual_soft,
+        qual_hard,
+        filename='settings_tradeoff_analysis.png',
+    ):
+        """
+        Plots two stacked charts:
+        1) Mean compression ratio vs. quality setting
+        2) Mean composite score vs. quality setting
+        """
+        # Grouping helper
+        def mean_by_quality(df, metric):
+            return (
+                df
+                .groupby('quality_compared_to')[metric]
+                .mean()
+                .sort_index()
+            )
+
+        # Plot configuration
+        fig, (ax_ratio, ax_score) = plt.subplots(
+            nrows=2, ncols=1, figsize=(12, 10), sharex=True
+        )
+
+        # Style map for each series (dataframe, metric, axis, label, style kwargs)
+        series_map = [
+            (comp_hard, 'compression_ratio', ax_ratio, 'Compression Hard', {'color': 'red',    'linestyle': '-',  'marker': 'o'}),
+            (comp_soft, 'compression_ratio', ax_ratio, 'Compression Soft', {'color': 'salmon', 'linestyle': '--','marker': 's'}),
+            (qual_hard, 'compression_ratio', ax_ratio, 'Quality Hard',     {'color': 'blue',   'linestyle': '-',  'marker': '^'}),
+            (qual_soft, 'compression_ratio', ax_ratio, 'Quality Soft',     {'color': 'skyblue','linestyle': '--','marker': 'D'}),
+
+            (qual_hard, 'composite_score',  ax_score, 'Quality Hard',     {'color': 'blue',   'linestyle': '-',  'marker': '^'}),
+            (qual_soft, 'composite_score',  ax_score, 'Quality Soft',     {'color': 'skyblue','linestyle': '--','marker': 'D'}),
+            (comp_hard, 'composite_score',  ax_score, 'Compression Hard', {'color': 'red',    'linestyle': '-',  'marker': 'o'}),
+            (comp_soft, 'composite_score',  ax_score, 'Compression Soft', {'color': 'salmon', 'linestyle': '--','marker': 's'}),
+        ]
+
+        # Plot each series
+        for df, metric, ax, label, style in series_map:
+            series = mean_by_quality(df, metric)
+            ax.plot(series.index, series.values, label=label, **style)
+
+        # Common formatting
+        for ax in (ax_ratio, ax_score):
+            ax.grid(alpha=0.3)
+            ax.legend(loc='upper right')
+
+        ax_ratio.set_ylabel('Compression Ratio')
+        ax_score.set_ylabel('Composite Score')
+        ax_score.set_xlabel('Quality Compared To')
+
+        # Ensure ticks cover all quality settings
+        all_qualities = sorted({
+            *comp_hard['quality_compared_to'],
+            *comp_soft['quality_compared_to'],
+            *qual_hard['quality_compared_to'],
+            *qual_soft['quality_compared_to'],
+        })
+        ax_score.set_xticks(all_qualities)
+
+        fig.suptitle('Settings Analysis', fontsize=16)
+
+        plt.tight_layout(rect=[0, 0, 1, 0.96])
+        fig.savefig(os.path.join(self.figures_dir, filename), dpi=300, bbox_inches='tight')
+        plt.show()
+
 
 if __name__ == "__main__":
     analysis = AMetricsAnalysis(
@@ -293,4 +372,4 @@ if __name__ == "__main__":
     )
 
     analysis.subsampling_analysis(visualize=True)
-    analysis.compare_strategies(top_n=5)
+    analysis.settings_analysis(top_n=5, visualize=True)
