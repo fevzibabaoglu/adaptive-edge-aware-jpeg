@@ -39,6 +39,7 @@ class AMetricsAnalysis:
     def __init__(
         self,
         results_dir,
+        figures_dir,
         compression_file,
         quality_file
     ):
@@ -47,6 +48,7 @@ class AMetricsAnalysis:
         quality_file_path = os.path.join(results_dir, quality_file)
 
         self.results_dir = results_dir
+        self.figures_dir = figures_dir
         self.df_compression = pd.read_csv(compression_file_path)
         self.df_quality = pd.read_csv(quality_file_path)
 
@@ -80,9 +82,10 @@ class AMetricsAnalysis:
 
         # Visualize the results
         if visualize:
-            AMetricsAnalysis._visualize_subsampling_analysis(
+            self._visualize_subsampling_analysis(
                 compression_stats,
                 quality_stats,
+                filename='subsampling_analysis.png',
             )
 
     @staticmethod
@@ -105,8 +108,12 @@ class AMetricsAnalysis:
         stats[numeric_cols] = stats[numeric_cols].round(4)
         return stats
 
-    @staticmethod
-    def _visualize_subsampling_analysis(compression_stats, quality_stats):
+    def _visualize_subsampling_analysis(
+            self,
+            compression_stats,
+            quality_stats,
+            filename='subsampling_analysis.png'
+        ):
         """Create a bar chart showing which subsampling method works best for each color space."""
         # Set the plot settings
         rows, cols = 2, 3
@@ -173,6 +180,7 @@ class AMetricsAnalysis:
                 ha='center', fontsize=10)
 
         plt.tight_layout(rect=[0, 0.08, 1, 0.95])
+        plt.savefig(os.path.join(self.figures_dir, filename), dpi=300, bbox_inches='tight')
         plt.show()
 
     def compare_strategies(self, top_n=5):
@@ -279,6 +287,7 @@ class AMetricsAnalysis:
 if __name__ == "__main__":
     analysis = AMetricsAnalysis(
         results_dir="test_results/csv",
+        figures_dir="test_results/fig",
         compression_file="better_compression_20250505-195717.csv",
         quality_file="better_quality_20250505-195717.csv",
     )
