@@ -63,22 +63,22 @@ class AMetricsAnalysis:
         # Compute stats for both datasets
         compression_stats = AMetricsAnalysis._compute_stats(
             self.df_compression,
-            key='compression_ratio',
-            secondary='composite_score'
+            quality='composite_score',
+            compression='compression_ratio'
         )
         quality_stats = AMetricsAnalysis._compute_stats(
             self.df_quality,
-            key='composite_score',
-            secondary='compression_ratio'
+            quality='composite_score',
+            compression='compression_ratio'
         )
 
         # Save stats to CSV
         compression_stats.to_csv(
-            os.path.join(self.results_dir, 'subsampling_priority_compression.csv'),
+            os.path.join(self.results_dir, 'analysis_subsampling_compression_priority.csv'),
             index=False
         )
         quality_stats.to_csv(
-            os.path.join(self.results_dir, 'subsampling_priority_quality.csv'),
+            os.path.join(self.results_dir, 'analysis_subsampling_quality_priority.csv'),
             index=False
         )
 
@@ -91,17 +91,17 @@ class AMetricsAnalysis:
             )
 
     @staticmethod
-    def _compute_stats(df, key, secondary):
+    def _compute_stats(df, quality, compression):
         """Group by color_space and subsampling, then compute median and mean for key and secondary."""
         stats = (
             df
             .groupby(['color_space', 'subsampling'])
             .agg(
                 **{
-                    f"{key}_median": (key, 'median'),
-                    f"{secondary}_median": (secondary, 'median'),
-                    f"{key}_mean": (key, 'mean'),
-                    f"{secondary}_mean": (secondary, 'mean'),
+                    f"{quality}_median": (quality, 'median'),
+                    f"{compression}_median": (compression, 'median'),
+                    f"{quality}_mean": (quality, 'mean'),
+                    f"{compression}_mean": (compression, 'mean'),
                 }
             )
             .reset_index()
@@ -207,7 +207,7 @@ class AMetricsAnalysis:
             min_threshold=1.0,
         )
         comp_soft_df.to_csv(
-            os.path.join(self.results_dir, 'best_compression_soft.csv'),
+            os.path.join(self.results_dir, 'analysis_best_compression_soft.csv'),
             index=False
         )
 
@@ -219,7 +219,7 @@ class AMetricsAnalysis:
             preserve_secondary=False,
         )
         comp_hard_df.to_csv(
-            os.path.join(self.results_dir, 'best_compression_hard.csv'),
+            os.path.join(self.results_dir, 'analysis_best_compression_hard.csv'),
             index=False
         )
 
@@ -233,7 +233,7 @@ class AMetricsAnalysis:
             min_threshold=1.0,
         )
         qual_soft_df.to_csv(
-            os.path.join(self.results_dir, 'best_quality_soft.csv'),
+            os.path.join(self.results_dir, 'analysis_best_quality_soft.csv'),
             index=False
         )
 
@@ -245,7 +245,7 @@ class AMetricsAnalysis:
             preserve_secondary=False,
         )
         qual_hard_df.to_csv(
-            os.path.join(self.results_dir, 'best_quality_hard.csv'),
+            os.path.join(self.results_dir, 'analysis_best_quality_hard.csv'),
             index=False
         )
 
