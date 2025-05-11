@@ -22,7 +22,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import ListedColormap
-from matplotlib.patches import Patch
 
 
 class AMetricsAnalysis:
@@ -147,9 +146,9 @@ class AMetricsAnalysis:
 
             # Plot the bars
             ax.bar(x - bar_width/2, comp_data['compression_ratio_median'], 
-                   bar_width, label='Compression', color='steelblue')
+                   bar_width, label='Compression Ratio', color='steelblue')
             ax.bar(x + bar_width/2, qual_data['composite_score_median'], 
-                   bar_width, label='Quality', color='darkorange')
+                   bar_width, label='Composite Score', color='darkorange')
 
             # Mark best methods with stars
             best_comp_idx = comp_data['compression_ratio_median'].argmax()
@@ -172,8 +171,7 @@ class AMetricsAnalysis:
 
         # Add legend (only once)
         handles, labels = axes[0].get_legend_handles_labels()
-        fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 0.05),
-                  ncol=2)
+        fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 0.05), ncol=2)
 
         # Add title and explanation
         fig.suptitle('Subsampling Performance by Color Space', fontsize=14)
@@ -331,7 +329,7 @@ class AMetricsAnalysis:
 
         # Plot configuration
         fig, (ax_ratio, ax_score) = plt.subplots(
-            nrows=2, ncols=1, figsize=(12, 10), sharex=True
+            nrows=2, ncols=1, figsize=(12, 7), sharex=True
         )
 
         # Style map for each series (dataframe, metric, axis, label, style kwargs)
@@ -370,7 +368,7 @@ class AMetricsAnalysis:
         })
         ax_score.set_xticks(all_qualities)
 
-        fig.suptitle('Settings Analysis', fontsize=16)
+        fig.suptitle('Settings Tradeoff Analysis', fontsize=16)
 
         plt.tight_layout(rect=[0, 0, 1, 0.96])
         fig.savefig(os.path.join(self.figures_dir, filename), dpi=300, bbox_inches='tight')
@@ -419,7 +417,7 @@ class AMetricsAnalysis:
             colors = np.vectorize(lambda v: idx_map.get(v, np.nan))(modal)
 
             # Plot
-            fig, ax = plt.subplots(figsize=(10, max(6, n_q * 0.6)))
+            fig, ax = plt.subplots(figsize=(7, max(3, n_q * 0.3)))
             ax.imshow(colors, aspect='auto', cmap=cmap)
 
             # Annotate
@@ -438,14 +436,6 @@ class AMetricsAnalysis:
             ax.grid(which='minor', color='white', linewidth=1.5)
             ax.tick_params(which='minor', length=0)
 
-            patches = [Patch(facecolor=cmap(i), label=v) for i, v in enumerate(vals)]
-            ax.legend(
-                handles=patches,
-                title=setting_name.replace('_', ' ').title(),
-                loc='upper center',
-                bbox_to_anchor=(0.5, -0.15),
-                ncol=min(5, len(vals))
-            )
             ax.set_title(f'Dominant {setting_name.replace("_", " ").title()} Settings')
             ax.set_ylabel('Quality Compared To')
 
