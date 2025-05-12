@@ -59,7 +59,6 @@ class JpegCompressionSettings:
     ], dtype=np.float32)
 
     # Color space settings
-    # ! SET THESE WITH BEST OPTIONS
     COLOR_SPACE_SETTINGS = {
         'ICaCb': {
             'downsampling_ratios': np.array([
