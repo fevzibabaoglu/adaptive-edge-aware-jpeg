@@ -152,13 +152,14 @@ class JpegCompressionSettings:
         color_space: str = 'YCoCg',
         quality_range: Tuple[int, int] = (40, 80),
         block_size_range: Tuple[int, int] = (4, 64)
-    ):
-        """Initialize compression settings.
+    ) -> None:
+        """
+        Initialize compression settings.
 
         Args:
             color_space (str): Color space to use for compression ('YCoCg', etc.).
-            quality_range (tuple): JPEG quality factor (1-99) range.
-            block_size_range (tuple): Min and max block sizes for adaptive blocking.
+            quality_range (Tuple[int, int]): JPEG quality factor (1-99) range.
+            block_size_range (Tuple[int, int]): Min and max block sizes for adaptive blocking.
         """
         if color_space not in self.COLOR_SPACE_SETTINGS:
             raise ValueError(f"Unsupported color space: {color_space}")
@@ -169,15 +170,16 @@ class JpegCompressionSettings:
 
         # Copy settings from the color space configuration
         color_space_config = self.COLOR_SPACE_SETTINGS[color_space]
-        self.downsampling_ratios = color_space_config['downsampling_ratios']
-        self.quantization_matrices = color_space_config['quantization_matrices']
+        self.downsampling_ratios: np.ndarray = color_space_config['downsampling_ratios']
+        self.quantization_matrices: List[np.ndarray] = color_space_config['quantization_matrices']
 
 
 class Jpeg:
     """JPEG compression and decompression implementation with adaptive blocking."""
 
     def __init__(self, settings: JpegCompressionSettings) -> None:
-        """Initialize JPEG compressor/decompressor.
+        """
+        Initialize JPEG compressor/decompressor.
 
         Args:
             settings (JpegCompressionSettings): Compression settings.
@@ -189,14 +191,25 @@ class Jpeg:
             settings: JpegCompressionSettings,
             layer_shape: Optional[Tuple[int, int]] = None
         ) -> None:
-        """Update compression settings."""
+        """
+        Update compression settings and precompute caches.
+
+        Args:
+            settings (JpegCompressionSettings): The new compression settings.
+            layer_shape (Optional[Tuple[int, int]]): The shape of the image layer (H, W).
+        """
         self.settings = settings
         if layer_shape is not None:
             self.update_layer_shapes(layer_shape)
         self.precompute_caches()
 
     def update_layer_shapes(self, layer_shape: Tuple[int, int]) -> None:
-        """Update layer shapes based on the original shape and downsampling ratios."""
+        """
+        Update layer shapes based on the original shape and downsampling ratios.
+
+        Args:
+            layer_shape (Tuple[int, int]): The shape of the image layer (H, W).
+        """
         self.layer_shape = layer_shape
         self.layer_shapes = self._compute_downsampled_shapes(self.layer_shape)
 
@@ -225,7 +238,8 @@ class Jpeg:
                 )
 
     def compress(self, img: Image) -> bytes:
-        """Compress the image.
+        """
+        Compresses the input image.
 
         Args:
             img (Image): Input image to compress.
@@ -258,7 +272,8 @@ class Jpeg:
         return img_encoded
 
     def decompress(self, img_encoded: bytes) -> Image:
-        """Decompress encoded image.
+        """
+        Decompresses encoded image data.
 
         Args:
             img_encoded (bytes): Encoded image data.
@@ -282,15 +297,39 @@ class Jpeg:
         return img
 
     def _convert_color_space(self, flattened_img: np.ndarray) -> np.ndarray:
-        """Convert from sRGB to target color space."""
+        """
+        Converts a flattened image from sRGB to the target color space.
+
+        Args:
+            flattened_img (np.ndarray): The flattened image data.
+
+        Returns:
+            np.ndarray: The image data in the new color space.
+        """
         return convert("sRGB", self.settings.color_space, flattened_img)
 
     def _convert_color_space_inverse(self, flattened_img: np.ndarray) -> np.ndarray:
-        """Convert from target color space back to sRGB."""
+        """
+        Converts a flattened image from the target color space back to sRGB.
+
+        Args:
+            flattened_img (np.ndarray): The flattened image data in the target color space.
+
+        Returns:
+            np.ndarray: The image data in sRGB.
+        """
         return convert(self.settings.color_space, "sRGB", flattened_img)
 
-    def _downsample(self, image_layers: List[np.ndarray]) -> List[np.ndarray]:
-        """Downsample image layers according to downsampling ratios."""
+    def _downsample(self, image_layers: np.ndarray) -> List[np.ndarray]:
+        """
+        Downsamples image layers according to the settings' downsampling ratios.
+
+        Args:
+            image_layers (np.ndarray): A (C, H, W) array of image layers.
+
+        Returns:
+            List[np.ndarray]: A list of downsampled image layers.
+        """
         downsampled_layers = []
         for i, layer in enumerate(image_layers):
             target_size = (self.layer_shapes[i][1], self.layer_shapes[i][0])
@@ -299,15 +338,34 @@ class Jpeg:
         return downsampled_layers
 
     def _upsample(self, image_layers: List[np.ndarray]) -> List[np.ndarray]:
-        """Upsample image layers to the target shape."""
+        """
+        Upsamples image layers to the original target shape.
+
+        Args:
+            image_layers (List[np.ndarray]): A list of downsampled image layers.
+
+        Returns:
+            List[np.ndarray]: A list of upsampled image layers.
+        """
         target_size = (self.layer_shape[1], self.layer_shape[0])
         return [
             cv.resize(layer, target_size, interpolation=cv.INTER_LINEAR)
             for layer in image_layers
         ]
 
-    def _block_split(self, image_layers: List[np.ndarray]) -> List[List[np.ndarray]]:
-        """Split image layers into adaptive blocks based on edge detection."""
+    def _block_split(self, image_layers: List[np.ndarray]) -> Tuple[List[List[np.ndarray]], List[List[str]], List[int]]:
+        """
+        Splits image layers into adaptive blocks using a quadtree based on edge detection.
+
+        Args:
+            image_layers (List[np.ndarray]): A list of image layers to split.
+
+        Returns:
+            Tuple[List[List[np.ndarray]], List[List[str]], List[int]]: A tuple containing:
+                - A list of block lists for each layer.
+                - A list of quadtree state strings for each layer.
+                - A list of quadtree root sizes for each layer.
+        """
         img_blocks = []
         states_list = []
         root_sizes = []
@@ -350,7 +408,15 @@ class Jpeg:
         return img_blocks, states_list, root_sizes
 
     def _block_merge(self, img_blocks: List[List[np.ndarray]]) -> List[np.ndarray]:
-        """Merge blocks back into complete image layers."""
+        """
+        Merges lists of blocks back into complete image layers.
+
+        Args:
+            img_blocks (List[List[np.ndarray]]): A list of block lists for each layer.
+
+        Returns:
+            List[np.ndarray]: A list of reconstructed and denormalized image layers.
+        """
         img_denormalized = []
 
         for i, blocks in enumerate(img_blocks):
@@ -393,15 +459,39 @@ class Jpeg:
         return img_denormalized
 
     def _apply_dct(self, img_blocks: List[List[np.ndarray]]) -> List[List[np.ndarray]]:
-        """Apply DCT transform to each block."""
+        """
+        Applies the Discrete Cosine Transform (DCT) to each block.
+
+        Args:
+            img_blocks (List[List[np.ndarray]]): List of block lists for each layer.
+
+        Returns:
+            List[List[np.ndarray]]: List of DCT-transformed block lists for each layer.
+        """
         return [[cv.dct(block) for block in blocks] for blocks in img_blocks]
 
     def _apply_inverse_dct(self, img_blocks: List[List[np.ndarray]]) -> List[List[np.ndarray]]:
-        """Apply inverse DCT transform to each block."""
+        """
+        Applies the Inverse Discrete Cosine Transform (IDCT) to each block.
+
+        Args:
+            img_blocks (List[List[np.ndarray]]): List of DCT-transformed block lists.
+
+        Returns:
+            List[List[np.ndarray]]: List of reconstructed block lists.
+        """
         return [[cv.idct(block) for block in blocks] for blocks in img_blocks]
 
     def _quantize(self, img_blocks: List[List[np.ndarray]]) -> List[List[np.ndarray]]:
-        """Quantize DCT coefficients using quality-adjusted quantization matrices."""
+        """
+        Quantizes DCT coefficients using quality-adjusted quantization matrices.
+
+        Args:
+            img_blocks (List[List[np.ndarray]]): List of DCT-transformed block lists.
+
+        Returns:
+            List[List[np.ndarray]]: List of quantized block lists (int32).
+        """
         result = []
 
         for i, blocks in enumerate(img_blocks):
@@ -416,7 +506,15 @@ class Jpeg:
         return result
 
     def _dequantize(self, img_blocks: List[List[np.ndarray]]) -> List[List[np.ndarray]]:
-        """Dequantize coefficients using quality-adjusted quantization matrices."""
+        """
+        Dequantizes coefficients using quality-adjusted quantization matrices.
+
+        Args:
+            img_blocks (List[List[np.ndarray]]): List of quantized block lists.
+
+        Returns:
+            List[List[np.ndarray]]: List of dequantized block lists (float32).
+        """
         result = []
 
         for i, blocks in enumerate(img_blocks):
@@ -430,8 +528,18 @@ class Jpeg:
 
         return result
 
-    def _entropy_encode(self, img_blocks: List[List[np.ndarray]], states_list: List[List[int]], root_sizes: List[int]) -> bytes:
-        """Entropy encode quantized coefficients."""
+    def _entropy_encode(self, img_blocks: List[List[np.ndarray]], states_list: List[List[str]], root_sizes: List[int]) -> bytes:
+        """
+        Performs entropy encoding on quantized coefficients and saves metadata.
+
+        Args:
+            img_blocks (List[List[np.ndarray]]): List of quantized block lists.
+            states_list (List[List[str]]): List of quadtree state strings for each layer.
+            root_sizes (List[int]): List of quadtree root sizes for each layer.
+
+        Returns:
+            bytes: The final compressed byte stream.
+        """
         output = BytesIO()
 
         # Write metadata
@@ -489,7 +597,15 @@ class Jpeg:
         return output.getvalue()
 
     def _entropy_decode(self, encoded_data: bytes) -> List[List[np.ndarray]]:
-        """Entropy decode compressed data to coefficients."""
+        """
+        Performs entropy decoding on a byte stream to reconstruct quantized coefficients.
+
+        Args:
+            encoded_data (bytes): The compressed byte stream from `_entropy_encode`.
+
+        Returns:
+            List[List[np.ndarray]]: A list of reconstructed block lists for each layer.
+        """
         input_stream = BytesIO(encoded_data)
         img_blocks = []
 
@@ -557,12 +673,28 @@ class Jpeg:
 
         return img_blocks
 
-    def _compute_downsampled_shapes(self, layer_shapes: Tuple[int, int]) -> np.ndarray:
-        """Compute downsampled shapes based on original shape and downsampling ratios."""
+    def _compute_downsampled_shapes(self, layer_shapes: np.ndarray) -> np.ndarray:
+        """
+        Computes downsampled shapes based on original shape and downsampling ratios.
+
+        Args:
+            layer_shapes (np.ndarray): The original (H, W) shape as a NumPy array.
+
+        Returns:
+            np.ndarray: A (C, 2) array of downsampled shapes for each layer.
+        """
         return layer_shapes // self.settings.downsampling_ratios
 
     def _get_quality_factor(self, block_size: int) -> int:
-        """Get quality factor based on block size and quality range."""
+        """
+        Gets a quality factor based on block size, interpolated from the quality range.
+
+        Args:
+            block_size (int): The size of the block for which to get the quality.
+
+        Returns:
+            int: The calculated quality factor.
+        """
         min_block_size, max_block_size = self.settings.block_size_range
         min_quality, max_quality = self.settings.quality_range
         if min_block_size == max_block_size:
@@ -574,7 +706,17 @@ class Jpeg:
 
     @staticmethod
     def _get_quantization_matrix(default_matrix: np.ndarray, size: int, quality: int) -> np.ndarray:
-        """Get a scaled quantization matrix for the specified quality and size."""
+        """
+        Gets a scaled quantization matrix for the specified quality and size.
+
+        Args:
+            default_matrix (np.ndarray): The standard 8x8 quantization matrix.
+            size (int): The target size of the matrix.
+            quality (int): The quality factor (1-99).
+
+        Returns:
+            np.ndarray: The resized and scaled quantization matrix.
+        """
         scale_factor = 5000 / quality if quality < 50 else 200 - 2 * quality
         scaled_matrix = np.floor((scale_factor * default_matrix + 50) / 100)
         resized_matrix = cv.resize(scaled_matrix, (size, size), interpolation=cv.INTER_LINEAR)
@@ -582,10 +724,18 @@ class Jpeg:
         return resized_matrix.astype(np.int32)
 
     @staticmethod
-    def _zigzag_ordering(size):
-        """Generate zigzag ordering indices for an nxn block."""
+    def _zigzag_ordering(size: int) -> np.ndarray:
+        """
+        Generates zigzag ordering indices for an n x n block.
+
+        Args:
+            size (int): The width/height of the square block.
+
+        Returns:
+            np.ndarray: An array of indices for flattening the block in zigzag order.
+        """
         if not isinstance(size, int) or size < 0:
-            raise ValueError("Block size must be an non-negative integer")
+            raise ValueError("Block size must be a non-negative integer")
 
         result = []
         row, col = 0, 0
@@ -616,8 +766,17 @@ class Jpeg:
         return np.array(result, dtype=np.int32)
 
     @staticmethod
-    def _decode_leaf_sizes(states, root_size):
-        """Decode quadtree structure from the header and generate leaf sizes."""
+    def _decode_leaf_sizes(states: List[int], root_size: int) -> List[int]:
+        """
+        Decodes the quadtree structure from the header to generate leaf sizes.
+
+        Args:
+            states (List[int]): A list of state integers (0, 1, 2) from the header.
+            root_size (int): The size of the root node of the quadtree.
+
+        Returns:
+            List[int]: A list of sizes for each leaf node in the tree.
+        """
         # Create leaf sizes by traversing the tree in the same order as encoding
         leaf_sizes = []
         state_idx = 0

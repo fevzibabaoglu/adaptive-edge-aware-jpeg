@@ -56,10 +56,10 @@ class OKLAB:
     def srgb_to_oklab(srgb: np.ndarray) -> np.ndarray:
         """
         Convert sRGB values to OKLAB.
-        
+
         Args:
             srgb (np.ndarray): sRGB array (shape: Nx3, values: [0, 1]).
-        
+
         Returns:
             np.ndarray: OKLAB array (shape: Nx3).
         """
@@ -78,10 +78,10 @@ class OKLAB:
     def oklab_to_srgb(oklab: np.ndarray) -> np.ndarray:
         """
         Convert OKLAB values to sRGB.
-        
+
         Args:
             oklab (np.ndarray): OKLAB array (shape: Nx3).
-        
+
         Returns:
             np.ndarray: sRGB array (shape: Nx3, values: [0, 1]).
         """

@@ -25,8 +25,32 @@ from .xyz import XYZ
 
 
 @nb.njit(fastmath=True, parallel=True, cache=True)
-def _xyz_to_jzazbz(xyz, b, g, d, d0, p, M_XYZ_TO_LMS, M_LMS_P_TO_IZAZBZ):
-    """XYZ to JzAzBz conversion using Numba."""
+def _xyz_to_jzazbz(
+    xyz: np.ndarray,
+    b: float,
+    g: float,
+    d: float,
+    d0: float,
+    p: float,
+    M_XYZ_TO_LMS: np.ndarray,
+    M_LMS_P_TO_IZAZBZ: np.ndarray,
+) -> np.ndarray:
+    """
+    Convert XYZ to JzAzBz using Numba.
+
+    Args:
+        xyz (np.ndarray): Input XYZ data (shape: Nx3).
+        b (float): Chromatic adaptation parameter B.
+        g (float): Chromatic adaptation parameter G.
+        d (float): JzAzBz parameter D.
+        d0 (float): JzAzBz parameter D0.
+        p (float): Custom PQ EOTF constant P.
+        M_XYZ_TO_LMS (np.ndarray): Transformation matrix from XYZ to LMS.
+        M_LMS_P_TO_IZAZBZ (np.ndarray): Transformation matrix from L'M'S' to IzAzBz.
+
+    Returns:
+        np.ndarray: Converted JzAzBz data (shape: Nx3).
+    """
     N = xyz.shape[0]
     jzazbz = np.empty_like(xyz, dtype=np.float32)
 
@@ -39,14 +63,14 @@ def _xyz_to_jzazbz(xyz, b, g, d, d0, p, M_XYZ_TO_LMS, M_LMS_P_TO_IZAZBZ):
         Z_p = Z
 
         # X'Y'Z' to LMS
-        L = (M_XYZ_TO_LMS[0, 0] * X_p + 
-             M_XYZ_TO_LMS[0, 1] * Y_p + 
+        L = (M_XYZ_TO_LMS[0, 0] * X_p +
+             M_XYZ_TO_LMS[0, 1] * Y_p +
              M_XYZ_TO_LMS[0, 2] * Z_p)
-        M = (M_XYZ_TO_LMS[1, 0] * X_p + 
-             M_XYZ_TO_LMS[1, 1] * Y_p + 
+        M = (M_XYZ_TO_LMS[1, 0] * X_p +
+             M_XYZ_TO_LMS[1, 1] * Y_p +
              M_XYZ_TO_LMS[1, 2] * Z_p)
-        S = (M_XYZ_TO_LMS[2, 0] * X_p + 
-             M_XYZ_TO_LMS[2, 1] * Y_p + 
+        S = (M_XYZ_TO_LMS[2, 0] * X_p +
+             M_XYZ_TO_LMS[2, 1] * Y_p +
              M_XYZ_TO_LMS[2, 2] * Z_p)
 
         # LMS to L'M'S' (PQ inverse EOTF transform)
@@ -75,8 +99,32 @@ def _xyz_to_jzazbz(xyz, b, g, d, d0, p, M_XYZ_TO_LMS, M_LMS_P_TO_IZAZBZ):
     return jzazbz
 
 @nb.njit(fastmath=True, parallel=True, cache=True)
-def _jzazbz_to_xyz(jzazbz, b, g, d, d0, p, M_LMS_TO_XYZ, M_IZAZBZ_TO_LMS_P):
-    """JzAzBz to XYZ conversion using Numba."""
+def _jzazbz_to_xyz(
+    jzazbz: np.ndarray,
+    b: float,
+    g: float,
+    d: float,
+    d0: float,
+    p: float,
+    M_LMS_TO_XYZ: np.ndarray,
+    M_IZAZBZ_TO_LMS_P: np.ndarray,
+) -> np.ndarray:
+    """
+    Convert JzAzBz to XYZ using Numba.
+
+    Args:
+        jzazbz (np.ndarray): Input JzAzBz data (shape: Nx3).
+        b (float): Chromatic adaptation parameter B.
+        g (float): Chromatic adaptation parameter G.
+        d (float): JzAzBz parameter D.
+        d0 (float): JzAzBz parameter D0.
+        p (float): Custom PQ EOTF constant P.
+        M_LMS_TO_XYZ (np.ndarray): Transformation matrix from LMS to XYZ.
+        M_IZAZBZ_TO_LMS_P (np.ndarray): Transformation matrix from IzAzBz to L'M'S'.
+
+    Returns:
+        np.ndarray: Converted XYZ data (shape: Nx3).
+    """
     N = jzazbz.shape[0]
     xyz = np.empty_like(jzazbz, dtype=np.float32)
 
@@ -97,7 +145,7 @@ def _jzazbz_to_xyz(jzazbz, b, g, d, d0, p, M_LMS_TO_XYZ, M_IZAZBZ_TO_LMS_P):
                M_IZAZBZ_TO_LMS_P[2, 1] * Az +
                M_IZAZBZ_TO_LMS_P[2, 2] * Bz)
 
-        # L'M'S' to LMS (inverse PQ)
+        # L'M'S' to LMS (PQ EOTF transform)
         L = _pq_eotf(L_p, m2=p)
         M = _pq_eotf(M_p, m2=p)
         S = _pq_eotf(S_p, m2=p)
@@ -166,10 +214,10 @@ class JzAzBz:
     def srgb_to_jzazbz(srgb: np.ndarray) -> np.ndarray:
         """
         Convert sRGB values to JzAzBz.
-        
+
         Args:
             srgb (np.ndarray): sRGB array (shape: Nx3, values: [0, 1]).
-        
+
         Returns:
             np.ndarray: JzAzBz array (shape: Nx3).
         """
@@ -189,18 +237,18 @@ class JzAzBz:
     def jzazbz_to_srgb(jzazbz: np.ndarray) -> np.ndarray:
         """
         Convert JzAzBz values to sRGB.
-        
+
         Args:
             jzazbz (np.ndarray): JzAzBz array (shape: Nx3).
-        
+
         Returns:
-            np.ndarray: sRGB array (values: [0, 1]).
+            np.ndarray: sRGB array (shape: Nx3, values: [0, 1]).
         """
         if not isinstance(jzazbz, np.ndarray):
             raise TypeError("Input must be a numpy array.")
         if jzazbz.ndim != 2 or jzazbz.shape[1] != 3:
             raise ValueError("Input array must be a 2D with 3 channels (jz, az, bz).")
-        
+
         xyz = _jzazbz_to_xyz(
             jzazbz,
             JzAzBz.B, JzAzBz.G, JzAzBz.D, JzAzBz.D0, JzAzBz.P,

@@ -19,14 +19,15 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import os
 from PIL import Image as PILImage
+from tkinter import messagebox, Tk, ttk
+from typing import Any, Dict, List, Tuple
 
-from tkinter import ttk, messagebox
-
-from .control_panel import ControlPanel
-from .preview_panel import PreviewPanel
 from color import get_color_spaces
 from image import Image
 from jpeg import Jpeg, JpegCompressionSettings
+
+from .control_panel import ControlPanel
+from .preview_panel import PreviewPanel
 
 
 class JpegApp:
@@ -34,34 +35,34 @@ class JpegApp:
 
     def __init__(
         self,
-        root,
-        default_color_space="YCoCg",
+        root: Tk,
+        default_color_space: str = "YCoCg",
         # Quality settings range
-        quality_range=(1, 99),
-        default_quality_range=(20, 60),
+        quality_range: Tuple[int, int] = (1, 99),
+        default_quality_range: Tuple[int, int] = (20, 60),
         # Block size settings range
-        block_size_range=(1, 8),
-        default_block_size_range=(2, 6),
+        block_size_range: Tuple[int, int] = (1, 8),
+        default_block_size_range: Tuple[int, int] = (2, 6),
         # File types for open/save dialogs
-        image_filetypes=(
+        image_filetypes: Tuple[Tuple[str, str], ...] = (
             ("Image files", "*.jpg *.jpeg *.png *.bmp *.tiff"),
         ),
-        ajpg_filetypes=(
+        ajpg_filetypes: Tuple[Tuple[str, str], ...] = (
             ("AJPG files", "*.ajpg"),
         ),
-    ):
+    ) -> None:
         """
         Initialize the JPEG customizer application.
 
         Args:
-            root: Tkinter root window
-            default_color_space: Default selected color space
-            quality_range: Min and max possible quality values (tuple)
-            default_quality_range: Default selected quality range (tuple)
-            block_size_range: Min and max possible block size exponents (tuple)
-            default_block_size_range: Default selected block size exponents (tuple)
-            image_filetypes: File type options for compress file dialogs
-            ajpg_filetypes: File type options for decompress file dialogs
+            root (tkinter.Tk): The root Tkinter window (e.g., tk.Tk()).
+            default_color_space (str): The default selected color space.
+            quality_range (Tuple[int, int]): The min and max possible quality values.
+            default_quality_range (Tuple[int, int]): The default selected quality range.
+            block_size_range (Tuple[int, int]): The min and max possible block size exponents.
+            default_block_size_range (Tuple[int, int]): The default selected block size exponents.
+            image_filetypes (Tuple[Tuple[str, str], ...]): File type options for image open dialogs.
+            ajpg_filetypes (Tuple[Tuple[str, str], ...]): File type options for AJPG open dialogs.
         """
         # Setup main window
         self.root = root
@@ -73,7 +74,7 @@ class JpegApp:
             quality_range=default_quality_range,
             block_size_range=[2 ** size for size in default_block_size_range],
         ))
-        self.files = []
+        self.files: List[str] = []
 
         # Create main application frame
         self.main_frame = ttk.Frame(self.root, padding="10")
@@ -113,8 +114,13 @@ class JpegApp:
         y_position = (self.root.winfo_screenheight() - self.root.winfo_height()) // 2
         self.root.geometry(f"+{x_position}+{y_position}")
 
-    def update_settings(self, new_settings):
-        """Update compression settings based on user input."""
+    def update_settings(self, new_settings: Dict[str, Any]) -> None:
+        """
+        Update compression settings based on user input from the control panel.
+
+        Args:
+            new_settings (Dict[str, Any]): A dictionary of new settings.
+        """
         # Update the JPEG compression engine with new settings
         self.jpeg.update_settings(JpegCompressionSettings(
             new_settings['color_space'],
@@ -124,8 +130,17 @@ class JpegApp:
         # Update selected files list
         self.files = new_settings['files']
 
-    def _process_preview(self, img):
-        """Process an image for preview using current compression settings."""
+    def _process_preview(self, img: Image) -> Tuple[Image, float]:
+        """
+        Process an image for preview using current compression settings.
+
+        Args:
+            img (Image): The input image to process.
+
+        Returns:
+            Tuple[Image, float]: A tuple containing the processed image and the
+                                 calculated compression ratio.
+        """
         # Compress and then decompress the image to show compression effects
         compressed = self.jpeg.compress(img)
         output_img = self.jpeg.decompress(compressed)
@@ -137,7 +152,7 @@ class JpegApp:
 
         return output_img, compression_ratio
 
-    def compress_images(self):
+    def compress_images(self) -> None:
         """Compress selected images using current settings into .ajpg format."""
         image_files = [f for f in self.files if not f.lower().endswith('.ajpg')]
 
@@ -152,14 +167,14 @@ class JpegApp:
             try:
                 self._compress_image(img_file)
             except Exception as e:
-                messagebox.showwarning(
-                    "Error processing image",
-                    f"{e}"
+                messagebox.showerror(
+                    "Error Compressing Image",
+                    f"Failed to compress {os.path.basename(img_file)}:\n{e}"
                 )
 
-        messagebox.showinfo("Info", "All images compressed successfully.")
+        messagebox.showinfo("Compression Complete", "All selected images have been compressed.")
 
-    def decompress_images(self):
+    def decompress_images(self) -> None:
         """Decompress selected .ajpg files back to standard image formats."""
         # Filter for .ajpg files only
         ajpg_files = [f for f in self.files if f.lower().endswith('.ajpg')]
@@ -175,22 +190,32 @@ class JpegApp:
             try:
                 self._decompress_image(ajpg_file)
             except Exception as e:
-                messagebox.showwarning(
-                    "Error processing image",
-                    f"{e}"
+                messagebox.showerror(
+                    "Error Decompressing Image",
+                    f"Failed to decompress {os.path.basename(ajpg_file)}:\n{e}"
                 )
 
-        messagebox.showinfo("Info", "All images decompressed successfully.")
+        messagebox.showinfo("Decompression Complete", "All selected images have been decompressed.")
 
-    def _compress_image(self, filename):
-        """Compress the selected image using current settings."""
+    def _compress_image(self, filename: str) -> None:
+        """
+        Compress a single image file.
+
+        Args:
+            filename (str): The path to the image file to compress.
+        """
         img = Image.load(filename)
         compressed = self.jpeg.compress(img)
         with open(os.path.splitext(filename)[0] + '.ajpg', 'wb') as f:
             f.write(compressed)
 
-    def _decompress_image(self, filename):
-        """Decompress the selected image using image metadata."""
+    def _decompress_image(self, filename: str) -> None:
+        """
+        Decompress a single .ajpg file.
+
+        Args:
+            filename (str): The path to the .ajpg file to decompress.
+        """
         with open(filename, 'rb') as f:
             compressed = f.read()
         img = Jpeg(JpegCompressionSettings()).decompress(compressed)

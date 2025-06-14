@@ -46,10 +46,10 @@ class YCbCr:
     def srgb_to_ycbcr(srgb: np.ndarray) -> np.ndarray:
         """
         Convert sRGB values to YCbCr.
-        
+
         Args:
             srgb (np.ndarray): sRGB array (shape: Nx3, values: [0, 1]).
-        
+
         Returns:
             np.ndarray: YCbCr array (shape: Nx3).
         """
@@ -57,25 +57,25 @@ class YCbCr:
             raise TypeError("Input must be a numpy array.")
         if srgb.ndim != 2 or srgb.shape[1] != 3:
             raise ValueError("Input array must be a 2D with 3 channels (r, g, b).")
-        
+
         return np.dot(srgb, YCbCr.M_SRGB_TO_YCBCR_T)
-    
+
     @staticmethod
     def ycbcr_to_srgb(ycbcr: np.ndarray) -> np.ndarray:
         """
         Convert YCbCr values to sRGB.
-        
+
         Args:
             ycbcr (np.ndarray): YCbCr array (shape: Nx3).
-        
+
         Returns:
-            np.ndarray: sRGB array (values: [0, 1]).
+            np.ndarray: sRGB array (shape: Nx3, values: [0, 1]).
         """
         if not isinstance(ycbcr, np.ndarray):
             raise TypeError("Input must be a numpy array.")
         if ycbcr.ndim != 2 or ycbcr.shape[1] != 3:
             raise ValueError("Input array must be a 2D with 3 channels (y, cb, cr).")
-        
+
         srgb = np.dot(ycbcr, YCbCr.M_YCBCR_TO_SRGB_T)
 
         # Clip values to ensure valid sRGB output (range: 0 to 1)

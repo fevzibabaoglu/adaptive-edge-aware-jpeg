@@ -67,10 +67,10 @@ class YCoCg:
     def srgb_to_ycocg(srgb: np.ndarray) -> np.ndarray:
         """
         Convert sRGB values to YCoCg.
-        
+
         Args:
             srgb (np.ndarray): sRGB array (shape: Nx3, values: [0, 1]).
-        
+
         Returns:
             np.ndarray: YCoCg array (shape: Nx3).
         """
@@ -78,38 +78,38 @@ class YCoCg:
             raise TypeError("Input must be a numpy array.")
         if srgb.ndim != 2 or srgb.shape[1] != 3:
             raise ValueError("Input array must be a 2D with 3 channels (r, g, b).")
-        
+
         return np.dot(srgb, YCoCg.M_SRGB_TO_YCOCG_T)
-    
+
     @staticmethod
     def ycocg_to_srgb(ycocg: np.ndarray) -> np.ndarray:
         """
         Convert YCoCg values to sRGB.
-        
+
         Args:
             ycocg (np.ndarray): YCoCg array (shape: Nx3).
-        
+
         Returns:
-            np.ndarray: sRGB array (values: [0, 1]).
+            np.ndarray: sRGB array (shape: Nx3, values: [0, 1]).
         """
         if not isinstance(ycocg, np.ndarray):
             raise TypeError("Input must be a numpy array.")
         if ycocg.ndim != 2 or ycocg.shape[1] != 3:
             raise ValueError("Input array must be a 2D with 3 channels (y, co, cg).")
-        
+
         srgb = np.dot(ycocg, YCoCg.M_YCOCG_TO_SRGB_T)
 
         # Clip values to ensure valid sRGB output (range: 0 to 1)
         return np.clip(srgb, 0.0, 1.0)
-    
+
     @staticmethod
     def srgb_to_ycocg_r(srgb: np.ndarray) -> np.ndarray:
         """
         Convert sRGB values to YCoCg-R.
-        
+
         Args:
             srgb (np.ndarray): sRGB array (shape: Nx3, values: [0, 1]).
-        
+
         Returns:
             np.ndarray: YCoCg-R array (shape: Nx3).
         """
@@ -117,26 +117,26 @@ class YCoCg:
             raise TypeError("Input must be a numpy array.")
         if srgb.ndim != 2 or srgb.shape[1] != 3:
             raise ValueError("Input array must be a 2D with 3 channels (r, g, b).")
-        
+
         return np.dot(srgb, YCoCg.M_SRGB_TO_YCOCG_R_T)
-    
+
     @staticmethod
     def ycocg_r_to_srgb(ycocg_r: np.ndarray) -> np.ndarray:
         """
         Convert YCoCg-R values to sRGB.
-        
+
         Args:
-            ycocg (np.ndarray): YCoCg-R array (shape: Nx3).
-        
+            ycocg_r (np.ndarray): YCoCg-R array (shape: Nx3).
+
         Returns:
-            np.ndarray: sRGB array (values: [0, 1]).
+            np.ndarray: sRGB array (shape: Nx3, values: [0, 1]).
         """
         if not isinstance(ycocg_r, np.ndarray):
             raise TypeError("Input must be a numpy array.")
         if ycocg_r.ndim != 2 or ycocg_r.shape[1] != 3:
             raise ValueError("Input array must be a 2D with 3 channels (y, co, cg).")
-        
+
         srgb = np.dot(ycocg_r, YCoCg.M_YCOCG_R_TO_SRGB_T)
-        
+
         # Clip values to ensure valid sRGB output (range: 0 to 1)
         return np.clip(srgb, 0.0, 1.0)

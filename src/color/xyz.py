@@ -19,7 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
 
-from .common import _srgb_to_linear_rgb, _linear_rgb_to_srgb
+from .common import _linear_rgb_to_srgb, _srgb_to_linear_rgb
 
 
 class XYZ:
@@ -48,10 +48,10 @@ class XYZ:
     def srgb_to_xyz(srgb: np.ndarray) -> np.ndarray:
         """
         Convert sRGB values to XYZ.
-        
+
         Args:
             srgb (np.ndarray): sRGB array (shape: Nx3, values: [0, 1]).
-        
+
         Returns:
             np.ndarray: XYZ array (shape: Nx3).
         """
@@ -67,10 +67,10 @@ class XYZ:
     def xyz_to_srgb(xyz: np.ndarray) -> np.ndarray:
         """
         Convert XYZ values to sRGB.
-        
+
         Args:
             xyz (np.ndarray): XYZ array (shape: Nx3).
-        
+
         Returns:
             np.ndarray: sRGB array (shape: Nx3, values: [0, 1]).
         """
@@ -78,6 +78,6 @@ class XYZ:
             raise TypeError("Input must be a numpy array.")
         if xyz.ndim != 2 or xyz.shape[1] != 3:
             raise ValueError("Input array must be a 2D with 3 channels (x, y, z).")
-        
+
         linear_rgb = np.dot(xyz, XYZ.M_XYZ_TO_LINEAR_RGB_T)
         return _linear_rgb_to_srgb(linear_rgb)

@@ -25,23 +25,37 @@ from .xyz import XYZ
 
 
 @nb.njit(fastmath=True, parallel=True, cache=True)
-def _xyz_to_ictcp(xyz, M_XYZ_TO_LMS, M_LMS_P_TO_ICTCP):
-    """XYZ to ICtCp conversion using Numba."""
+def _xyz_to_ictcp(
+    xyz: np.ndarray,
+    M_XYZ_TO_LMS: np.ndarray,
+    M_LMS_P_TO_ICTCP: np.ndarray,
+) -> np.ndarray:
+    """
+    Convert XYZ to ICtCp using Numba.
+
+    Args:
+        xyz (np.ndarray): Input XYZ data (shape: Nx3).
+        M_XYZ_TO_LMS (np.ndarray): Transformation matrix from XYZ to LMS.
+        M_LMS_P_TO_ICTCP (np.ndarray): Transformation matrix from L'M'S' to ICtCp.
+
+    Returns:
+        np.ndarray: Converted ICtCp data (shape: Nx3).
+    """
     N = xyz.shape[0]
-    icacb = np.empty_like(xyz, dtype=np.float32)
+    ictcp = np.empty_like(xyz, dtype=np.float32)
 
     for i in nb.prange(N):
         X, Y, Z = xyz[i, 0], xyz[i, 1], xyz[i, 2]
 
         # XYZ to LMS
-        L = (M_XYZ_TO_LMS[0, 0] * X + 
-             M_XYZ_TO_LMS[0, 1] * Y + 
+        L = (M_XYZ_TO_LMS[0, 0] * X +
+             M_XYZ_TO_LMS[0, 1] * Y +
              M_XYZ_TO_LMS[0, 2] * Z)
-        M = (M_XYZ_TO_LMS[1, 0] * X + 
-             M_XYZ_TO_LMS[1, 1] * Y + 
+        M = (M_XYZ_TO_LMS[1, 0] * X +
+             M_XYZ_TO_LMS[1, 1] * Y +
              M_XYZ_TO_LMS[1, 2] * Z)
-        S = (M_XYZ_TO_LMS[2, 0] * X + 
-             M_XYZ_TO_LMS[2, 1] * Y + 
+        S = (M_XYZ_TO_LMS[2, 0] * X +
+             M_XYZ_TO_LMS[2, 1] * Y +
              M_XYZ_TO_LMS[2, 2] * Z)
 
         # LMS to L'M'S' (PQ inverse EOTF transform)
@@ -60,15 +74,29 @@ def _xyz_to_ictcp(xyz, M_XYZ_TO_LMS, M_LMS_P_TO_ICTCP):
               M_LMS_P_TO_ICTCP[2, 1] * M_p +
               M_LMS_P_TO_ICTCP[2, 2] * S_p)
 
-        icacb[i, 0] = I_
-        icacb[i, 1] = Ct
-        icacb[i, 2] = Cp
+        ictcp[i, 0] = I_
+        ictcp[i, 1] = Ct
+        ictcp[i, 2] = Cp
 
-    return icacb
+    return ictcp
 
 @nb.njit(fastmath=True, parallel=True, cache=True)
-def _ictcp_to_xyz(ictcp, M_LMS_TO_XYZ, M_ICTCP_TO_LMS_P):
-    """ICtCp to XYZ conversion using Numba."""
+def _ictcp_to_xyz(
+    ictcp: np.ndarray,
+    M_LMS_TO_XYZ: np.ndarray,
+    M_ICTCP_TO_LMS_P: np.ndarray
+) -> np.ndarray:
+    """
+    Convert ICtCp to XYZ using Numba.
+
+    Args:
+        ictcp (np.ndarray): Input ICtCp data (shape: Nx3).
+        M_LMS_TO_XYZ (np.ndarray): Transformation matrix from LMS to XYZ.
+        M_ICTCP_TO_LMS_P (np.ndarray): Transformation matrix from ICtCp to L'M'S'.
+
+    Returns:
+        np.ndarray: Converted XYZ data (shape: Nx3).
+    """
     N = ictcp.shape[0]
     xyz = np.empty_like(ictcp, dtype=np.float32)
 
@@ -85,7 +113,7 @@ def _ictcp_to_xyz(ictcp, M_LMS_TO_XYZ, M_ICTCP_TO_LMS_P):
         S_p = (M_ICTCP_TO_LMS_P[2, 0] * I_ +
                M_ICTCP_TO_LMS_P[2, 1] * Ct +
                M_ICTCP_TO_LMS_P[2, 2] * Cp)
-        
+
         # L'M'S' to LMS (PQ EOTF transform)
         L = _pq_eotf(L_p)
         M = _pq_eotf(M_p)
@@ -101,7 +129,7 @@ def _ictcp_to_xyz(ictcp, M_LMS_TO_XYZ, M_ICTCP_TO_LMS_P):
         Z = (M_LMS_TO_XYZ[2, 0] * L +
              M_LMS_TO_XYZ[2, 1] * M +
              M_LMS_TO_XYZ[2, 2] * S)
-        
+
         xyz[i, 0] = X
         xyz[i, 1] = Y
         xyz[i, 2] = Z
@@ -139,10 +167,10 @@ class ICtCp:
     def srgb_to_ictcp(srgb: np.ndarray) -> np.ndarray:
         """
         Convert sRGB values to ICtCp.
-        
+
         Args:
             srgb (np.ndarray): sRGB array (shape: Nx3, values: [0, 1]).
-        
+
         Returns:
             np.ndarray: ICtCp array (shape: Nx3).
         """
@@ -150,7 +178,7 @@ class ICtCp:
             raise TypeError("Input must be a numpy array.")
         if srgb.ndim != 2 or srgb.shape[1] != 3:
             raise ValueError("Input array must be a 2D with 3 channels (r, g, b).")
-        
+
         xyz = XYZ.srgb_to_xyz(srgb)
         return _xyz_to_ictcp(
             xyz,
@@ -161,18 +189,18 @@ class ICtCp:
     def ictcp_to_srgb(ictcp: np.ndarray) -> np.ndarray:
         """
         Convert ICtCp values to sRGB.
-        
+
         Args:
             ictcp (np.ndarray): ICtCp array (shape: Nx3).
-        
+
         Returns:
-            np.ndarray: sRGB array (values: [0, 1]).
+            np.ndarray: sRGB array (shape: Nx3, values: [0, 1]).
         """
         if not isinstance(ictcp, np.ndarray):
             raise TypeError("Input must be a numpy array.")
         if ictcp.ndim != 2 or ictcp.shape[1] != 3:
-            raise ValueError("Input array must be a 3D with 3 channels (i, ct, cp).")
-        
+            raise ValueError("Input array must be a 2D with 3 channels (i, ct, cp).")
+
         xyz = _ictcp_to_xyz(
             ictcp,
             ICtCp.M_LMS_TO_XYZ, ICtCp.M_ICTCP_TO_LMS_P

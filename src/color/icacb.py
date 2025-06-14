@@ -25,8 +25,22 @@ from .xyz import XYZ
 
 
 @nb.njit(fastmath=True, parallel=True, cache=True)
-def _xyz_to_icacb(xyz, M_XYZ_TO_RGB_BAR, M_RGB_P_TO_ICACB):
-    """XYZ to ICaCb conversion using Numba."""
+def _xyz_to_icacb(
+    xyz: np.ndarray,
+    M_XYZ_TO_RGB_BAR: np.ndarray,
+    M_RGB_P_TO_ICACB: np.ndarray,
+) -> np.ndarray:
+    """
+    Convert XYZ to ICaCb using Numba.
+
+    Args:
+        xyz (np.ndarray): Input XYZ data (shape: Nx3).
+        M_XYZ_TO_RGB_BAR (np.ndarray): Transformation matrix from XYZ to RGB_bar.
+        M_RGB_P_TO_ICACB (np.ndarray): Transformation matrix from R'G'B' to ICaCb.
+
+    Returns:
+        np.ndarray: Converted ICaCb data (shape: Nx3).
+    """
     N = xyz.shape[0]
     icacb = np.empty_like(xyz, dtype=np.float32)
 
@@ -34,14 +48,14 @@ def _xyz_to_icacb(xyz, M_XYZ_TO_RGB_BAR, M_RGB_P_TO_ICACB):
         X, Y, Z = xyz[i, 0], xyz[i, 1], xyz[i, 2]
 
         # XYZ to RGB_bar
-        R_bar = (M_XYZ_TO_RGB_BAR[0, 0] * X + 
-                 M_XYZ_TO_RGB_BAR[0, 1] * Y + 
+        R_bar = (M_XYZ_TO_RGB_BAR[0, 0] * X +
+                 M_XYZ_TO_RGB_BAR[0, 1] * Y +
                  M_XYZ_TO_RGB_BAR[0, 2] * Z)
-        G_bar = (M_XYZ_TO_RGB_BAR[1, 0] * X + 
-                 M_XYZ_TO_RGB_BAR[1, 1] * Y + 
+        G_bar = (M_XYZ_TO_RGB_BAR[1, 0] * X +
+                 M_XYZ_TO_RGB_BAR[1, 1] * Y +
                  M_XYZ_TO_RGB_BAR[1, 2] * Z)
-        B_bar = (M_XYZ_TO_RGB_BAR[2, 0] * X + 
-                 M_XYZ_TO_RGB_BAR[2, 1] * Y + 
+        B_bar = (M_XYZ_TO_RGB_BAR[2, 0] * X +
+                 M_XYZ_TO_RGB_BAR[2, 1] * Y +
                  M_XYZ_TO_RGB_BAR[2, 2] * Z)
 
         # RGB_bar to R'G'B' (PQ inverse EOTF transform)
@@ -67,8 +81,22 @@ def _xyz_to_icacb(xyz, M_XYZ_TO_RGB_BAR, M_RGB_P_TO_ICACB):
     return icacb
 
 @nb.njit(fastmath=True, parallel=True, cache=True)
-def _icacb_to_xyz(icacb, M_RGB_BAR_TO_XYZ, M_ICACB_TO_RGB_P):
-    """ICaCb to XYZ conversion using Numba."""
+def _icacb_to_xyz(
+    icacb: np.ndarray,
+    M_RGB_BAR_TO_XYZ: np.ndarray,
+    M_ICACB_TO_RGB_P: np.ndarray
+) -> np.ndarray:
+    """
+    Convert ICaCb to XYZ using Numba.
+
+    Args:
+        icacb (np.ndarray): Input ICaCb data (shape: Nx3).
+        M_RGB_BAR_TO_XYZ (np.ndarray): Transformation matrix from RGB_bar to XYZ.
+        M_ICACB_TO_RGB_P (np.ndarray): Transformation matrix from ICaCb to R'G'B'.
+
+    Returns:
+        np.ndarray: Converted XYZ data (shape: Nx3).
+    """
     N = icacb.shape[0]
     xyz = np.empty_like(icacb, dtype=np.float32)
 
@@ -85,7 +113,7 @@ def _icacb_to_xyz(icacb, M_RGB_BAR_TO_XYZ, M_ICACB_TO_RGB_P):
         B_p = (M_ICACB_TO_RGB_P[2, 0] * I_ +
                M_ICACB_TO_RGB_P[2, 1] * Ca +
                M_ICACB_TO_RGB_P[2, 2] * Cb)
-        
+
         # R'G'B' to RGB_bar (PQ EOTF transform)
         R_bar = _pq_eotf(R_p)
         G_bar = _pq_eotf(G_p)
@@ -101,7 +129,7 @@ def _icacb_to_xyz(icacb, M_RGB_BAR_TO_XYZ, M_ICACB_TO_RGB_P):
         Z = (M_RGB_BAR_TO_XYZ[2, 0] * R_bar +
              M_RGB_BAR_TO_XYZ[2, 1] * G_bar +
              M_RGB_BAR_TO_XYZ[2, 2] * B_bar)
-        
+
         xyz[i, 0] = X
         xyz[i, 1] = Y
         xyz[i, 2] = Z
@@ -139,10 +167,10 @@ class ICaCb:
     def srgb_to_icacb(srgb: np.ndarray) -> np.ndarray:
         """
         Convert sRGB values to ICaCb.
-        
+
         Args:
             srgb (np.ndarray): sRGB array (shape: Nx3, values: [0, 1]).
-        
+
         Returns:
             np.ndarray: ICaCb array (shape: Nx3).
         """
@@ -150,7 +178,7 @@ class ICaCb:
             raise TypeError("Input must be a numpy array.")
         if srgb.ndim != 2 or srgb.shape[1] != 3:
             raise ValueError("Input array must be a 2D with 3 channels (r, g, b).")
-        
+
         xyz = XYZ.srgb_to_xyz(srgb)
         return _xyz_to_icacb(
             xyz,
@@ -161,18 +189,18 @@ class ICaCb:
     def icacb_to_srgb(icacb: np.ndarray) -> np.ndarray:
         """
         Convert ICaCb values to sRGB.
-        
+
         Args:
             icacb (np.ndarray): ICaCb array (shape: Nx3).
-        
+
         Returns:
-            np.ndarray: sRGB array (values: [0, 1]).
+            np.ndarray: sRGB array (shape: Nx3, values: [0, 1]).
         """
         if not isinstance(icacb, np.ndarray):
             raise TypeError("Input must be a numpy array.")
         if icacb.ndim != 2 or icacb.shape[1] != 3:
             raise ValueError("Input array must be a 2D with 3 channels (i, ca, cb).")
-        
+
         xyz = _icacb_to_xyz(
             icacb,
             ICaCb.M_RGB_BAR_TO_XYZ, ICaCb.M_ICACB_TO_RGB_P

@@ -22,8 +22,17 @@ import numba as nb
 
 
 @nb.njit(fastmath=True, cache=True)
-def largest_power_of_2(n):
-    """Returns the largest power of 2 less than `n`."""
+def largest_power_of_2(n: int) -> int:
+    """
+    Returns the largest power of 2 less than or equal to `n`.
+    If n is a power of 2, returns n. If not, returns the next lowest power of 2.
+
+    Args:
+        n (int): The input integer.
+
+    Returns:
+        int: The largest power of 2 less than or equal to n.
+    """
     if n <= 0:
         raise ValueError("n must be positive.")
     if n <= 2:

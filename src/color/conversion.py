@@ -19,13 +19,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
 
-from .common import _normalize, _denormalize
+from .common import _denormalize, _normalize
 from .icacb import ICaCb
 from .ictcp import ICtCp
 from .jzazbz import JzAzBz
 from .oklab import OKLAB
-from .ycbcr import YCbCr
 from .xyz import XYZ
+from .ycbcr import YCbCr
 from .ycocg import YCoCg
 
 
@@ -33,49 +33,49 @@ from .ycocg import YCoCg
 COLOR_CLASSES = {
     'sRGB': (None, None, None, None),
     'ICaCb': (
-        ICaCb.srgb_to_icacb, 
+        ICaCb.srgb_to_icacb,
         ICaCb.icacb_to_srgb,
         ICaCb.MIDPOINTS,
         ICaCb.SCALE_FACTORS,
     ),
     'ICtCp': (
-        ICtCp.srgb_to_ictcp, 
+        ICtCp.srgb_to_ictcp,
         ICtCp.ictcp_to_srgb,
         ICtCp.MIDPOINTS,
         ICtCp.SCALE_FACTORS,
     ),
     'JzAzBz': (
-        JzAzBz.srgb_to_jzazbz, 
+        JzAzBz.srgb_to_jzazbz,
         JzAzBz.jzazbz_to_srgb,
         JzAzBz.MIDPOINTS,
         JzAzBz.SCALE_FACTORS,
     ),
     'OKLAB': (
-        OKLAB.srgb_to_oklab, 
-        OKLAB.oklab_to_srgb, 
-        OKLAB.MIDPOINTS, 
+        OKLAB.srgb_to_oklab,
+        OKLAB.oklab_to_srgb,
+        OKLAB.MIDPOINTS,
         OKLAB.SCALE_FACTORS,
     ),
     'YCbCr': (
-        YCbCr.srgb_to_ycbcr, 
+        YCbCr.srgb_to_ycbcr,
         YCbCr.ycbcr_to_srgb,
         YCbCr.MIDPOINTS,
         YCbCr.SCALE_FACTORS,
     ),
     'XYZ': (
-        XYZ.srgb_to_xyz, 
+        XYZ.srgb_to_xyz,
         XYZ.xyz_to_srgb,
         XYZ.MIDPOINTS,
         XYZ.SCALE_FACTORS,
     ),
     'YCoCg': (
-        YCoCg.srgb_to_ycocg, 
+        YCoCg.srgb_to_ycocg,
         YCoCg.ycocg_to_srgb,
         YCoCg.YCOCG_MIDPOINTS,
         YCoCg.YCOCG_SCALE_FACTORS,
     ),
     'YCoCg-R': (
-        YCoCg.srgb_to_ycocg_r, 
+        YCoCg.srgb_to_ycocg_r,
         YCoCg.ycocg_r_to_srgb,
         YCoCg.YCOCG_R_MIDPOINTS,
         YCoCg.YCOCG_R_SCALE_FACTORS,
@@ -83,12 +83,12 @@ COLOR_CLASSES = {
 }
 
 
-def get_color_spaces() -> list:
+def get_color_spaces() -> list[str]:
     """
     Get a list of available color spaces.
-    
+
     Returns:
-        list: A list of available color spaces.
+        list[str]: A list of available color spaces.
     """
     return list(set(COLOR_CLASSES) - {'sRGB'} - {'XYZ'})
 
@@ -96,7 +96,7 @@ def convert(from_space: str, to_space: str, data: np.ndarray) -> np.ndarray:
     """
     Convert color data from one color space to another.
     One of the color spaces must be sRGB.
-    
+
     Args:
         from_space (str): The source color space (e.g., "sRGB", "XYZ", "ICaCb").
         to_space (str): The target color space (e.g., "ICtCp", "JzAzBz").
@@ -104,15 +104,12 @@ def convert(from_space: str, to_space: str, data: np.ndarray) -> np.ndarray:
 
     Returns:
         np.ndarray: Converted color data in the target color space (shape: Nx3).
-
-    Raises:
-        ValueError: If no conversion method is found.
     """
     if not isinstance(data, np.ndarray):
         raise TypeError("Data input must be a numpy array.")
     if data.ndim != 2 or data.shape[1] != 3:
         raise ValueError("Data input array must be a 2D with 3 channels.")
-    
+
     if from_space not in COLOR_CLASSES.keys() or to_space not in COLOR_CLASSES.keys():
         raise ValueError("Invalid color space. Please check the available color spaces.")
     if from_space != "sRGB" and to_space != "sRGB":
@@ -128,33 +125,33 @@ def convert(from_space: str, to_space: str, data: np.ndarray) -> np.ndarray:
 
 def apply_normalization(color_space: str, data: np.ndarray, inverse: bool) -> np.ndarray:
     """
-    Normalize the color data.
+    Normalize or denormalize the color data.
 
     Args:
         color_space (str): The data color space (e.g., "sRGB", "XYZ", "ICaCb").
         data (np.ndarray): The input color data array (shape: Nx3).
-        inverse (bool): Whether to applynormalization or denormalization.
+        inverse (bool): If True, applies denormalization. If False, applies normalization.
 
     Returns:
-        np.ndarray: Normalized/Denormalized color data in the target color space (shape: Nx3).
+        np.ndarray: Normalized or denormalized color data (shape: Nx3).
     """
     if not isinstance(data, np.ndarray):
         raise TypeError("Data input must be a numpy array.")
     if data.ndim != 2 or data.shape[1] != 3:
         raise ValueError("Data input array must be a 2D with 3 channels.")
-    
+
     if color_space not in COLOR_CLASSES.keys():
         raise ValueError("Invalid color space. Please check the available color spaces.")
-    
+
     if inverse:
         return _denormalize(
-            data, 
+            data,
             COLOR_CLASSES[color_space][2],
             COLOR_CLASSES[color_space][3]
         )
     else:
         return _normalize(
-            data, 
+            data,
             COLOR_CLASSES[color_space][2],
             COLOR_CLASSES[color_space][3]
         )

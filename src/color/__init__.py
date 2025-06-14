@@ -17,6 +17,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 
-__all__ = ['get_color_spaces', 'convert', 'apply_normalization']
+__all__ = ['apply_normalization', 'convert', 'get_color_spaces']
 
-from .conversion import get_color_spaces, convert, apply_normalization
+from .conversion import apply_normalization, convert, get_color_spaces

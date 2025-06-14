@@ -18,9 +18,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 
 import os
-
 import tkinter as tk
-from tkinter import ttk, filedialog
+from tkinter import filedialog, ttk
+from typing import Any, Callable, Dict, List, Tuple
 
 from .range_slider import RangeSlider
 
@@ -28,244 +28,212 @@ from .range_slider import RangeSlider
 class ControlPanel:
     """Manages the control section of the application with automatic change notifications."""
 
+    # UI Constants
+    _PADDING: int = 10
+    _FILES_TEXT_HEIGHT: int = 4
+    _FILES_TEXT_WIDTH: int = 30
+    _FILE_SELECT_TEXT: str = "Select Images for Processing"
+
+
     def __init__(
         self,
-        parent,
-        on_change_callback,
-        on_compress_callback,
-        on_decompress_callback,
-        color_spaces,
-        default_color_space,
-        quality_range,
-        default_quality_range,
-        block_size_range,
-        default_block_size_range,
-        filetypes,
-        slider_width=280,
-        slider_height=40,
-        slider_color="#4a86e8",
-        file_select_text="Select Images for Processing",
-        process_button_text="Process All Selected Images",
-        padding=10,
-        files_text_height=4,
-        files_text_width=30
-    ):
+        parent: tk.Frame,
+        on_change_callback: Callable[[Dict[str, Any]], Any],
+        on_compress_callback: Callable[[], Any],
+        on_decompress_callback: Callable[[], Any],
+        color_spaces: List[str],
+        default_color_space: str,
+        quality_range: Tuple[int, int],
+        default_quality_range: Tuple[int, int],
+        block_size_range: Tuple[int, int],
+        default_block_size_range: Tuple[int, int],
+        filetypes: Tuple[Tuple[str, str], ...],
+    ) -> None:
         """
-        Initialize the control panel with configurable options.
+        Initialize the control panel.
 
         Args:
-            parent: Parent tkinter widget
-            on_change_callback: Function called whenever any setting changes
-            on_compress_callback: Function called when compress button is clicked
-            on_decompress_callback: Function called when decompress button is clicked
-            color_spaces: List of available color spaces
-            default_color_space: Default selected color space
-            quality_range: Tuple of (min, max) for quality slider
-            default_quality_range: Default (min, max) for quality slider
-            block_size_range: Tuple of (min, max) for block size slider powers
-            default_block_size_range: Default (min, max) for block size slider
-            filetypes: Tuple of file type filters for file dialog
-            slider_width: Width of range sliders
-            slider_height: Height of range sliders
-            slider_color: Color for slider selection
-            file_select_text: Text for file selection button
-            process_button_text: Text for process button
-            padding: Padding for the label frames
-            files_text_height: Height of the files text area
-            files_text_width: Width of the files text area
+            parent (tkinter.Frame): The parent tkinter frame.
+            on_change_callback (Callable): Function to call when any setting changes.
+            on_compress_callback (Callable): Function to call when the compress button is clicked.
+            on_decompress_callback (Callable): Function to call when the decompress button is clicked.
+            color_spaces (List[str]): A list of available color spaces for the dropdown.
+            default_color_space (str): The default color space to be selected.
+            quality_range (Tuple[int, int]): A tuple of (min, max) for the quality slider.
+            default_quality_range (Tuple[int, int]): The default (min, max) selection for the quality slider.
+            block_size_range (Tuple[int, int]): A tuple of (min, max) for the block size slider powers.
+            default_block_size_range (Tuple[int, int]): The default (min, max) for the block size slider.
+            filetypes (Tuple[Tuple[str, str], ...]): A tuple of file type filters for the file dialog.
         """
-        # Store parameters
         self.parent = parent
         self.on_change_callback = on_change_callback
         self.on_compress_callback = on_compress_callback
         self.on_decompress_callback = on_decompress_callback
         self.filetypes = filetypes
-        self.slider_config = {
-            "width": slider_width,
-            "height": slider_height,
-            "selection_color": slider_color,
-            "value_type": int,
-        }
-        self.padding = padding
 
-        # State variables
-        self.selected_files = []
+        self.selected_files: List[str] = []
         self.color_space = tk.StringVar(value=default_color_space)
         self.color_space.trace_add("write", self._on_setting_changed)
 
-        # Quality and block size ranges
-        self.quality_range = quality_range
-        self.default_quality = default_quality_range
-        self.block_size_range = block_size_range
-        self.default_block_size = default_block_size_range
-
-        # UI text values
-        self.file_select_text = file_select_text
-        self.process_button_text = process_button_text
-        self.files_text_height = files_text_height
-        self.files_text_width = files_text_width
-        self.color_spaces = color_spaces
-
-        # Build UI
         self._build_main_frame()
         self._build_file_selection()
-        self._build_color_space_selector()
-        self._build_quality_controls()
-        self._build_block_size_controls()
+        self._build_color_space_selector(color_spaces)
+        self._build_quality_controls(quality_range, default_quality_range)
+        self._build_block_size_controls(block_size_range, default_block_size_range)
         self._create_action_buttons()
 
-    def _build_main_frame(self):
-        """Create the main container frame."""
+    def _build_main_frame(self) -> None:
+        """Create the main container frame for the control panel."""
         self.frame = ttk.Frame(self.parent)
 
-    def _build_file_selection(self):
+    def _build_file_selection(self) -> None:
         """Build the file selection section."""
-        self.file_frame = ttk.LabelFrame(self.frame, text="Batch Processing", padding=self.padding)
+        self.file_frame = ttk.LabelFrame(self.frame, text="Batch Processing", padding=self._PADDING)
         self.file_frame.pack(fill='x', pady=(0, 10))
 
-        ttk.Button(
-            self.file_frame,
-            text=self.file_select_text,
-            command=self.select_files
-        ).pack(fill='x')
+        ttk.Button(self.file_frame, text=self._FILE_SELECT_TEXT, command=self.select_files).pack(fill='x')
 
         self.files_text = tk.Text(
             self.file_frame,
-            height=self.files_text_height,
-            width=self.files_text_width,
+            height=self._FILES_TEXT_HEIGHT,
+            width=self._FILES_TEXT_WIDTH,
             wrap='word',
             state='disabled'
         )
         self.files_text.pack(fill='x', expand=True, pady=(5, 0))
 
-    def _build_color_space_selector(self):
-        """Build the color space selection dropdown."""
-        self.color_frame = ttk.LabelFrame(self.frame, text="Color Space", padding=self.padding)
+    def _build_color_space_selector(self, color_spaces: List[str]) -> None:
+        """
+        Build the color space selection dropdown.
+
+        Args:
+            color_spaces (List[str]): A list of available color spaces for the dropdown.
+        """
+        self.color_frame = ttk.LabelFrame(self.frame, text="Color Space", padding=self._PADDING)
         self.color_frame.pack(fill='x', pady=(0, 10))
 
         self.color_combo = ttk.Combobox(
-            self.color_frame,
-            textvariable=self.color_space,
-            values=self.color_spaces,
-            state='readonly'
+            self.color_frame, textvariable=self.color_space, values=color_spaces, state='readonly'
         )
         self.color_combo.pack(fill='x')
 
-        # Remove selection highlight completely
+        # Remove selection highlight
         self.color_combo.bind("<<ComboboxSelected>>", self._on_combo_selected)
-
-        # Apply style to remove the focus highlighting
         self._apply_combo_style()
 
-    def _apply_combo_style(self):
-        """Apply styling to the combobox."""
+    def _apply_combo_style(self) -> None:
+        """Apply custom styling to the combobox to remove selection highlight."""
         style = ttk.Style()
         style.map('TCombobox', fieldbackground=[('readonly', 'white')])
         style.map('TCombobox', selectbackground=[('readonly', 'white')])
         style.map('TCombobox', selectforeground=[('readonly', 'black')])
 
-    def _build_quality_controls(self):
-        """Build the quality range slider section."""
-        self.quality_frame = ttk.LabelFrame(self.frame, text="Quality Range", padding=self.padding)
+    def _build_quality_controls(self, quality_range: Tuple[int, int], default_quality: Tuple[int, int]) -> None:
+        """
+        Build the UI for the quality range slider.
+
+        Args:
+            quality_range (Tuple[int, int]): The min and max possible values.
+            default_quality (Tuple[int, int]): The initial selected range.
+        """
+        self.quality_frame = ttk.LabelFrame(self.frame, text="Quality Range", padding=self._PADDING)
         self.quality_frame.pack(fill='x', pady=(0, 10))
 
         self.quality_label = ttk.Label(
-            self.quality_frame,
-            text=f"Quality: {self.default_quality[0]} - {self.default_quality[1]}"
+            self.quality_frame, text=f"Quality: {default_quality[0]} - {default_quality[1]}"
         )
         self.quality_label.pack(anchor='w', pady=(0, 5))
 
-        self.quality_slider = self._create_quality_slider()
+        self.quality_slider = self._create_quality_slider(quality_range, default_quality)
         self.quality_slider.pack(fill='x')
 
-    def _build_block_size_controls(self):
-        """Build the block size range slider section."""
-        self.block_frame = ttk.LabelFrame(self.frame, text="Block Size Range", padding=self.padding)
+    def _build_block_size_controls(self, block_size_range: Tuple[int, int], default_block_size: Tuple[int, int]) -> None:
+        """
+        Build the UI for the block size range slider.
+
+        Args:
+            block_size_range (Tuple[int, int]): The min and max possible exponent values.
+            default_block_size (Tuple[int, int]): The initial selected exponent range.
+        """
+        self.block_frame = ttk.LabelFrame(self.frame, text="Block Size Range", padding=self._PADDING)
         self.block_frame.pack(fill='x', pady=(0, 10))
 
-        min_block = 2**self.default_block_size[0]
-        max_block = 2**self.default_block_size[1]
+        min_block_size = 2**default_block_size[0]
+        max_block_size = 2**default_block_size[1]
         self.block_size_label = ttk.Label(
-            self.block_frame,
-            text=f"Block Size: {min_block} - {max_block}"
+            self.block_frame, text=f"Block Size: {min_block_size} - {max_block_size}"
         )
         self.block_size_label.pack(anchor='w', pady=(0, 5))
 
-        self.block_size_slider = self._create_block_size_slider()
+        self.block_size_slider = self._create_block_size_slider(block_size_range, default_block_size)
         self.block_size_slider.pack(fill='x')
 
-    def _create_quality_slider(self):
-        """Create the quality range slider."""
-        def on_quality_change(values):
-            min_val, max_val = values
-            self.quality_label.config(text=f"Quality: {min_val} - {max_val}")
+    def _create_quality_slider(self, quality_range: Tuple[int, int], default_quality: Tuple[int, int]) -> RangeSlider:
+        """
+        Create and configure the quality range slider.
+
+        Args:
+            quality_range (Tuple[int, int]): The min and max possible values.
+            default_quality (Tuple[int, int]): The initial selected range.
+
+        Returns:
+            RangeSlider: The configured slider widget.
+        """
+        def on_quality_change(values: Tuple[int, int]) -> None:
+            self.quality_label.config(text=f"Quality: {values[0]} - {values[1]}")
 
         return RangeSlider(
             self.quality_frame,
             on_change_callback=on_quality_change,
             on_update_callback=self._on_setting_changed,
-            min_val=self.quality_range[0],
-            max_val=self.quality_range[1],
-            initial_min=self.default_quality[0],
-            initial_max=self.default_quality[1],
-            **self.slider_config
+            min_val=quality_range[0], max_val=quality_range[1],
+            initial_min=default_quality[0], initial_max=default_quality[1]
         )
 
-    def _create_block_size_slider(self):
-        """Create the block size range slider."""
-        def on_block_size_change(values):
-            min_val, max_val = values
-            self.block_size_label.config(text=f"Block Size: {2**min_val} - {2**max_val}")
+    def _create_block_size_slider(self, block_size_range: Tuple[int, int], default_block_size: Tuple[int, int]) -> RangeSlider:
+        """
+        Create and configure the block size range slider.
+
+        Args:
+            block_size_range (Tuple[int, int]): The min and max possible exponent values.
+            default_block_size (Tuple[int, int]): The initial selected exponent range.
+
+        Returns:
+            RangeSlider: The configured slider widget.
+        """
+        def on_block_size_change(values: Tuple[int, int]) -> None:
+            self.block_size_label.config(text=f"Block Size: {2**values[0]} - {2**values[1]}")
 
         return RangeSlider(
             self.block_frame,
             on_change_callback=on_block_size_change,
             on_update_callback=self._on_setting_changed,
-            min_val=self.block_size_range[0],
-            max_val=self.block_size_range[1],
-            initial_min=self.default_block_size[0],
-            initial_max=self.default_block_size[1],
-            **self.slider_config
+            min_val=block_size_range[0], max_val=block_size_range[1],
+            initial_min=default_block_size[0], initial_max=default_block_size[1]
         )
 
-    def _create_action_buttons(self):
+    def _create_action_buttons(self) -> None:
         """Create action buttons (Compress, Decompress)."""
         button_frame = ttk.Frame(self.frame)
         button_frame.pack(fill='x', pady=10)
 
-        # Compress button
-        compress_btn = ttk.Button(
-            button_frame,
-            text="Compress",
-            command=self.on_compress_callback
-        )
+        compress_btn = ttk.Button(button_frame, text="Compress", command=self.on_compress_callback)
         compress_btn.pack(side='left', expand=True, fill='x', padx=(0, 5))
+        decompress_btn = ttk.Button(button_frame, text="Decompress", command=self.on_decompress_callback)
 
-        # Decompress button
-        decompress_btn = ttk.Button(
-            button_frame,
-            text="Decompress",
-            command=self.on_decompress_callback
-        )
         decompress_btn.pack(side='right', expand=True, fill='x', padx=(5, 0))
 
-        # File type info
-        ttk.Label(
-            self.frame,
-            text="Compressed files will be saved as .ajpg",
-            font=('', 8)
-        ).pack(anchor='w', pady=(5, 0))
+        ttk.Label(self.frame, text="Compressed files will be saved as .ajpg", font=('', 8)).pack(anchor='w', pady=(5, 0))
 
-    def select_files(self):
+    def select_files(self) -> None:
         """Handle image file selection for batch processing."""
         files = filedialog.askopenfilenames(filetypes=self.filetypes)
-
         if files:
             self.selected_files = list(files)
             self._update_files_text()
             self._on_setting_changed()
 
-    def _update_files_text(self):
+    def _update_files_text(self) -> None:
         """Update the text widget with selected file names."""
         self.files_text.config(state='normal')
         self.files_text.delete(1.0, tk.END)
@@ -278,17 +246,31 @@ class ControlPanel:
 
         self.files_text.config(state='disabled')
 
-    def _on_setting_changed(self, *args):
-        """Called whenever any setting changes to notify parent."""
-        settings = self.get_current_settings()
-        self.on_change_callback(settings)
+    def _on_setting_changed(self, *args: Any) -> None:
+        """
+        Callback to notify the parent application when a setting changes.
 
-    def _on_combo_selected(self, event):
-        """Handle combobox selection and clear highlight."""
+        Args:
+            *args: Variable arguments passed by the tkinter event trace.
+        """
+        self.on_change_callback(self.get_current_settings())
+
+    def _on_combo_selected(self, event: Any) -> None:
+        """
+        Handle combobox selection to clear the highlight.
+
+        Args:
+            event (Any): The tkinter event object.
+        """
         self.color_combo.selection_clear()
 
-    def get_current_settings(self):
-        """Get all current settings as a dictionary."""
+    def get_current_settings(self) -> Dict[str, Any]:
+        """
+        Get all current settings from the control panel as a dictionary.
+
+        Returns:
+            Dict[str, Any]: A dictionary containing all current settings.
+        """
         return {
             'color_space': self.color_space.get(),
             'quality_min': self.quality_slider.get_values()[0],
