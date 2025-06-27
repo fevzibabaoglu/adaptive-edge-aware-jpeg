@@ -129,4 +129,4 @@ The full paper is available within this repository and provides an in-depth expl
 
 *   **[Read the Full Paper (PDF)](./docs/adaptive_edge_aware_jpeg.pdf)**
 
-**If you use this project or its findings in your own research, please consider citing the paper.**
+**If you use this project or its findings in your own research, please consider citing the repository.**
